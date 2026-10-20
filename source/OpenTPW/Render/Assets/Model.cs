@@ -61,6 +61,14 @@ public class Model : Asset
 		Device.UpdateBuffer( IndexBuffer, 0, indices );
 	}
 
+	/// <summary>
+	/// Replaces the vertex data, e.g. for vertex animation. The vertex count must not change.
+	/// </summary>
+	public void UpdateVertices( Vertex[] vertices )
+	{
+		Device.UpdateBuffer( VertexBuffer, 0, vertices );
+	}
+
 	internal void Draw()
 	{
 		var commandList = Render.CommandList;
