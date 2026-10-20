@@ -20,8 +20,8 @@ public sealed class FontFile : BaseFormat
 		4 bytes: Character (UTF-16)
 		4 bytes: Bitmap size in bytes (a multiple of 8)
 		4 bytes: Size of the bitmap at 4 bits per pixel
-		4 bytes: Encoding - 0: 4 bits per pixel, high nibble first; 1: compressed 4 bits per pixel
-		         (not decoded yet; the CASH* fonts use it); 2: 1 bit per pixel
+		4 bytes: Encoding - 0: 4 bits per pixel, high nibble first; 1: run-length coded 4 bits per
+		         pixel (see DecodeRuns); 2: 1 bit per pixel
 		2 bytes: Width
 		2 bytes: Height
 		1 byte:  X offset (signed)
@@ -40,12 +40,12 @@ public sealed class FontFile : BaseFormat
 		public int Advance { get; set; }
 
 		/// <summary>
-		/// 0: 4 bits per pixel; 1: compressed 4 bits per pixel; 2: 1 bit per pixel.
+		/// 0: 4 bits per pixel; 1: run-length coded 4 bits per pixel; 2: 1 bit per pixel.
 		/// </summary>
 		public int Encoding { get; set; }
 
 		/// <summary>
-		/// Coverage from 0 to 255, Width * Height, row by row. All zero for encoding 1.
+		/// Coverage from 0 to 255, Width * Height, row by row.
 		/// </summary>
 		public byte[] Pixels { get; set; }
 	}
@@ -109,6 +109,9 @@ public sealed class FontFile : BaseFormat
 
 			var bitmap = reader.ReadBytes( bitmapSize );
 			glyph.Pixels = new byte[glyph.Width * glyph.Height];
+			if ( glyph.Encoding == 1 )
+				DecodeRuns( bitmap, glyph.Pixels );
+
 			for ( int p = 0; p < glyph.Pixels.Length; p++ )
 			{
 				if ( glyph.Encoding == 2 && (p >> 3) < bitmap.Length )
@@ -126,6 +129,33 @@ public sealed class FontFile : BaseFormat
 
 			// Unused slots repeat a placeholder character; keep the first
 			glyphsByCharacter.TryAdd( glyph.Character, glyph );
+		}
+	}
+
+	/// <summary>
+	/// Encoding 1, read as 4-bit units, high nibble first: a non-zero unit is one pixel of that value;
+	/// a zero is followed by a count and a value, for that many pixels. Runs may end past the last
+	/// pixel, and pixels after the data ends are transparent.
+	/// </summary>
+	private static void DecodeRuns( byte[] data, byte[] pixels )
+	{
+		int Nibble( int n ) => (data[n >> 1] >> ((n & 1) == 0 ? 4 : 0)) & 0xF;
+
+		int count = data.Length * 2, n = 0, p = 0;
+		while ( p < pixels.Length && n < count )
+		{
+			int value = Nibble( n++ ), run = 1;
+			if ( value == 0 )
+			{
+				if ( n + 1 >= count )
+					break;
+
+				run = Nibble( n++ );
+				value = Nibble( n++ );
+			}
+
+			for ( ; run > 0 && p < pixels.Length; run-- )
+				pixels[p++] = (byte)(value * 17);
 		}
 	}
 
