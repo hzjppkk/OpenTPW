@@ -25,7 +25,7 @@ public sealed class LobbyIsland : Entity
 				else
 				{
 					var j = mesh.Materials[i];
-					textures.Add( new Texture( $"lobby/terrain/textures/{j.Name}.wct", TextureFlags.Repeat ) );
+					textures.Add( j.Name == null ? Texture.Missing : new Texture( $"lobby/terrain/textures/{j.Name}.wct", TextureFlags.Repeat ) );
 				}
 			}
 
@@ -45,7 +45,7 @@ public sealed class LobbyIsland : Entity
 			}
 
 			var model = new Model( [.. vertices], mesh.Indices, material );
-			Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out var rot, out var pos );
+			Matrix4x4.Decompose( mesh.WorldTransform, out var scl, out var rot, out var pos );
 
 			var position = new Vector3( pos.X, pos.Z, pos.Y - 2.5f );
 			var rotation = new Quaternion( rot.X, rot.Z, rot.Y, -rot.W );
