@@ -61,17 +61,19 @@ internal static class Game
 		//
 		// Create level
 		//
+		// --park <level> previews the level's starting park from its save instead of the lobby.
+		bool previewPark = args.Length == 2 && args[0] == "--park";
 #if DEBUG
 		// Debug options: --verify-lobby <dir> runs scene transitions through production callbacks
 		// without injecting OS input; --lobby-view <file> pins the camera for retail comparison;
 		// --capture-frames <dir> saves 30 consecutive frames after a 20 second warm-up.
-		var options = DebugOptions( args );
+		var options = DebugOptions( previewPark ? [] : args );
 		LobbyCameraMode.FixedViewPath = options.GetValueOrDefault( "--lobby-view" );
 #endif
 		using var audio = new AudioSystem( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
 		audio.ConfigureQuality( LobbyOptionsSettings.Current.AudioQuality );
 		if ( LobbyOptionsSettings.Current.Preferences is { } preferences ) audio.ConfigurePreferences( preferences );
-		var level = new Level( "jungle", audio );
+		var level = new Level( previewPark ? args[1] : "jungle", audio, previewPark );
 #if DEBUG
 		LobbyAcceptance? acceptance = options.TryGetValue( "--verify-lobby", out var output ) ? new( level, output ) : null;
 		LobbyOptionsAcceptance? optionsAcceptance = options.TryGetValue( "--verify-options", out var optionsOutput ) ? new( level, optionsOutput ) : null;

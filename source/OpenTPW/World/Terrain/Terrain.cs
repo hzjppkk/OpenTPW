@@ -5,7 +5,7 @@
 /// </summary>
 public class Terrain : ModelEntity
 {
-	public Terrain( string levelName )
+	public Terrain( string levelName, SaveFile? save = null )
 	{
 		var modelFile = new ModelFile( $"levels/{levelName}/terrain/base.md2" );
 		var heightfield = modelFile.Heightfield;
@@ -19,8 +19,8 @@ public class Terrain : ModelEntity
 		{
 			for ( int x = 0; x < heightfield.Width; x++ )
 			{
-				int id = heightfield.TextureAt( x, z );
-				if ( heightfield.IsWater( x, z ) || slots.ContainsKey( id ) || slots.Count == 16 )
+				int id = TextureAt( x, z );
+				if ( IsWater( x, z ) || slots.ContainsKey( id ) || slots.Count == 16 )
 					continue;
 
 				slots[id] = slots.Count;
@@ -44,10 +44,10 @@ public class Terrain : ModelEntity
 		{
 			for ( int x = 0; x < heightfield.Width; x++ )
 			{
-				if ( heightfield.IsWater( x, z ) )
+				if ( IsWater( x, z ) )
 					continue;
 
-				int slot = slots.GetValueOrDefault( heightfield.TextureAt( x, z ) );
+				int slot = slots.GetValueOrDefault( TextureAt( x, z ) );
 				uint first = (uint)vertices.Count;
 
 				vertices.Add( Corner( heightfield, x, z, new Vector2( 0, 0 ), slot ) );
@@ -60,6 +60,21 @@ public class Terrain : ModelEntity
 		}
 
 		Model = new Model( [.. vertices], [.. indices], material );
+		Rotation = System.Numerics.Quaternion.Identity;
+
+		bool IsWater( int x, int z ) => heightfield.IsWater( x, z )
+			|| (save != null && save.Map[z * SaveFile.MapSize + x].Type == 2);
+
+		int TextureAt( int x, int z )
+		{
+			if ( save != null && save.Map[z * SaveFile.MapSize + x].Type == 1 )
+			{
+				int road = Array.FindIndex( modelFile.TextureNames, name => name.Equals( "grd_ctr1", StringComparison.OrdinalIgnoreCase ) );
+				if ( road >= 0 )
+					return road;
+			}
+			return heightfield.TextureAt( x, z );
+		}
 	}
 
 	/// <summary>
