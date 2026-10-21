@@ -47,6 +47,12 @@ public class SaveModuleTests
 				if ( save.ClockTime == 0 || string.IsNullOrEmpty( save.BuildStamp ) || save.GameSystem.Length != 9 )
 					failures.Add( $"{path}: clock {save.ClockTime}, build '{save.BuildStamp}'" );
 
+				var dateSet = save.GameMonth is >= 0 and <= 11 && save.GameDay >= 1
+					&& save.GameDay <= DateTime.DaysInMonth( 2000, save.GameMonth + 1 );
+				var dateNotSetYet = save.GameMonth == 0 && save.GameDay == -1;
+				if ( !(dateSet || dateNotSetYet) || save.FunnySecondsPerRealSecond <= 0 )
+					failures.Add( $"{path}: date {save.GameMonth}/{save.GameDay}, {save.FunnySecondsPerRealSecond} funny seconds per real second" );
+
 				var objects = save.Objects.Select( x => x.TypeId ).OrderBy( x => x ).ToList();
 				var placed = save.PlacedRides.Select( x => x.TypeId ).OrderBy( x => x ).ToList();
 				if ( !objects.SequenceEqual( placed ) )

@@ -19,7 +19,8 @@ public sealed partial class SaveFile : BaseFormat
 		64 bytes:   header (see ReadHeader)
 		4806 bytes: object controls
 		670 bytes:  staff pool
-		46 bytes:   game time, visitor arrival
+		28 bytes:   game time (8 mFunnyTimeStart, 8 mSessionStart, 4 month, 4 day, 4 funny seconds per real second)
+		18 bytes:   visitor arrival
 		128 x 128 map cells, row by row:
 			1 byte:  parts present
 			bit 0:   52 bytes - cell base, then litter, pylon and status fields
@@ -139,6 +140,28 @@ public sealed partial class SaveFile : BaseFormat
 	public bool ParkClosed { get; private set; }
 
 	/// <summary>
+	/// mFunnyTimeStart: where the game's calendar starts (1 January 2000 in every sample).
+	/// </summary>
+	public DateTime FunnyTimeStart { get; private set; }
+
+	/// <summary>
+	/// mSessionStart as stored, a 100 ns count in the same format as <see cref="FunnyTimeStart"/>; its role is not confirmed.
+	/// </summary>
+	public long SessionStart { get; private set; }
+
+	/// <summary>
+	/// mMonthAtLastUpdate and mDayAtLastUpdate: the in-game date when the save was made. The month counts from
+	/// 0 (January); the day from 1. Before the calendar's first update (a fresh restart point) they are 0 and -1.
+	/// </summary>
+	public int GameMonth { get; private set; }
+	public int GameDay { get; private set; }
+
+	/// <summary>
+	/// In-game seconds per real second (15000 in every sample).
+	/// </summary>
+	public int FunnySecondsPerRealSecond { get; private set; }
+
+	/// <summary>
 	/// From the bank account thing.
 	/// </summary>
 	public int Balance { get; private set; }
@@ -169,7 +192,9 @@ public sealed partial class SaveFile : BaseFormat
 		reader.Skip( reader.ReadInt32() );
 
 		ReadHeader( reader );
-		reader.Skip( 4806 + 670 + 46 );
+		reader.Skip( 4806 + 670 );
+		ReadGameTime( reader );
+		reader.Skip( 18 );                    // visitor arrival
 		ReadMap( reader );
 		ReadThings( reader );
 
@@ -186,6 +211,15 @@ public sealed partial class SaveFile : BaseFormat
 		ParkClosed = reader.ReadUInt32() != 0;
 		VisitorsToDate = reader.ReadInt32();
 		reader.Skip( 2 * 2 + 4 + 2 * 5 + 4 + 2 * 6 ); // gate and light ids, random seed, singleton ids, world state, first staff ids
+	}
+
+	private void ReadGameTime( BinaryReader reader )
+	{
+		FunnyTimeStart = DateTime.FromFileTimeUtc( reader.ReadInt64() );
+		SessionStart = reader.ReadInt64();
+		GameMonth = reader.ReadInt32();
+		GameDay = reader.ReadInt32();
+		FunnySecondsPerRealSecond = reader.ReadInt32();
 	}
 
 	private void ReadMap( BinaryReader reader )
