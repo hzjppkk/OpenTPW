@@ -37,6 +37,34 @@ public class StringAndSaveTests
 	}
 
 	[TestMethod]
+	public void EveryFontReads()
+	{
+		GameData.Require();
+
+		var fonts = FileSystem.GetFiles( "Language/English" ).Where( x => x.EndsWith( ".bf4", StringComparison.OrdinalIgnoreCase ) ).ToList();
+
+		// The lobby labels use TITLEMED.bf4
+		Assert.IsTrue( fonts.Any( x => Path.GetFileName( x ).Equals( "TITLEMED.bf4", StringComparison.OrdinalIgnoreCase ) ) );
+
+		var failures = new List<string>();
+		foreach ( var path in fonts )
+		{
+			try
+			{
+				var font = new FontFile( new MemoryStream( File.ReadAllBytes( path ) ) );
+				if ( font.Glyphs.Length == 0 || font.LineHeight - font.Top <= 0 )
+					failures.Add( $"{path}: {font.Glyphs.Length} glyphs, height {font.LineHeight - font.Top}" );
+			}
+			catch ( Exception e )
+			{
+				failures.Add( $"{path}: {e.Message}" );
+			}
+		}
+
+		Assert.AreEqual( 0, failures.Count, string.Join( "\n", failures ) );
+	}
+
+	[TestMethod]
 	public void EverySaveInTheDataDecompresses()
 	{
 		GameData.Require();
