@@ -11,24 +11,24 @@ internal static class Game
 		Log = new();
 
 		//
-		// Check if the game data directory exists
+		// Find the game data directory (throws if there is none)
 		//
-		if ( !Path.Exists( $"{Settings.Default.GamePath}/data/" ) )
-			throw new DirectoryNotFoundException( "Theme Park World not found" );
+		var gamePath = GameDir.GamePath;
+		Log.Info( $"Game data: {gamePath}" );
 
 		// Register game data directory
-		FileSystem = new BaseFileSystem( $"{Settings.Default.GamePath}/data/" );
+		FileSystem = new BaseFileSystem( $"{gamePath}/data/" );
 		FileSystem.RegisterArchiveHandler<WadArchive>( ".wad" );
 		FileSystem.RegisterArchiveHandler<SdtArchive>( ".sdt" );
 
 		//
 		// Check if the save data directory exists (create if not)
 		//
-		if ( !Path.Exists( $"{Settings.Default.GamePath}/save/" ) )
-			Directory.CreateDirectory( $"{Settings.Default.GamePath}/save/" );
+		if ( !Path.Exists( $"{gamePath}/save/" ) )
+			Directory.CreateDirectory( $"{gamePath}/save/" );
 
 		// Register save data directory
-		SaveFileSystem = new BaseFileSystem( $"{Settings.Default.GamePath}/save/" );
+		SaveFileSystem = new BaseFileSystem( $"{gamePath}/save/" );
 
 		//
 		// Custom OpenTPW cache directory (mainly for editor-related stuff)

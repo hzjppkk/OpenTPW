@@ -7,18 +7,41 @@ using System.Linq;
 namespace OpenTPW.Tests;
 
 /// <summary>
-/// Tests over the whole game data. Set OPENTPW_GAME_PATH to the game folder (the one with data/);
-/// without it, or without the data, these tests are inconclusive rather than failing.
+/// The repository's content/ folder, found from the test's directory upwards.
+/// </summary>
+internal static class Content
+{
+	public static string GetPath( string path )
+	{
+		for ( var directory = new DirectoryInfo( Environment.CurrentDirectory ); directory != null; directory = directory.Parent )
+		{
+			var candidate = Path.Combine( directory.FullName, "content", path );
+			if ( File.Exists( candidate ) )
+				return candidate;
+		}
+
+		throw new FileNotFoundException( $"content/{path} not found from {Environment.CurrentDirectory}" );
+	}
+}
+
+/// <summary>
+/// Tests over the whole game data, found the way the game finds it (<see cref="GameDir.Find"/>) from
+/// the test's directory: put the game folder (the one with data/) there or in a folder above it.
+/// Without it these tests are inconclusive rather than failing.
 /// </summary>
 internal static class GameData
 {
-	public static string GamePath => Environment.GetEnvironmentVariable( "OPENTPW_GAME_PATH" ) ?? "C:\\Program Files (x86)\\Bullfrog\\Theme Park World";
+	public static string? GamePath => GameDir.Find( Environment.CurrentDirectory );
 
 	public static void Require()
 	{
-		var data = Path.Combine( GamePath, "data" );
-		if ( !Directory.Exists( data ) )
-			Assert.Inconclusive( $"No game data at {data}; set OPENTPW_GAME_PATH" );
+		if ( GamePath is not string gamePath )
+		{
+			Assert.Inconclusive( $"No game data found from {Environment.CurrentDirectory}" );
+			return;
+		}
+
+		var data = Path.Combine( gamePath, "data" );
 
 		Log ??= new();
 		FileSystem = new BaseFileSystem( data );

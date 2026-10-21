@@ -25,7 +25,7 @@ namespace OpenTPW {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("C:\\Program Files (x86)\\Bullfrog\\Theme Park World")]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string GamePath {
             get {
                 return ((string)(this["GamePath"]));
