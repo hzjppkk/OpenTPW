@@ -25,6 +25,35 @@ internal static class Content
 }
 
 /// <summary>
+/// A folder of sample saves, samples/saves, found the way the game folder is found
+/// (<see cref="GameDir.Find"/>): in the test's directory and each folder above it, the folder itself
+/// and then its direct subfolders.
+/// </summary>
+internal static class SampleSaves
+{
+	public static string? Find()
+	{
+		for ( var directory = new DirectoryInfo( Environment.CurrentDirectory ); directory != null; directory = directory.Parent )
+		{
+			var candidates = new List<string> { directory.FullName };
+			try
+			{
+				candidates.AddRange( Directory.GetDirectories( directory.FullName ).Order( StringComparer.OrdinalIgnoreCase ) );
+			}
+			catch ( Exception e ) when ( e is UnauthorizedAccessException or IOException )
+			{
+			}
+
+			var match = candidates.Select( x => Path.Combine( x, "samples", "saves" ) ).FirstOrDefault( Directory.Exists );
+			if ( match != null )
+				return match;
+		}
+
+		return null;
+	}
+}
+
+/// <summary>
 /// Tests over the whole game data, found the way the game finds it (<see cref="GameDir.Find"/>) from
 /// the test's directory: put the game folder (the one with data/) there or in a folder above it.
 /// Without it these tests are inconclusive rather than failing.
