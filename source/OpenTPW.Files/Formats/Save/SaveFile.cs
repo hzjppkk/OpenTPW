@@ -1,10 +1,10 @@
 namespace OpenTPW;
 
 /// <summary>
-/// The park in a save (.tpws) or level start file (.tpwi): the map and the things on it. Reads the
-/// World module of the decompressed data (see <see cref="SaveReader"/>); the later modules are not read.
+/// The park in a save (.tpws) or level start file (.tpwi): the map and the things on it, then the game's
+/// other modules (see SaveFile.Modules.cs). Reads the decompressed data (see <see cref="SaveReader"/>).
 /// </summary>
-public sealed class SaveFile : BaseFormat
+public sealed partial class SaveFile : BaseFormat
 {
 	/*
 	Decompressed data: modules in this order, each but the first and last followed by a four-character tag
@@ -13,7 +13,7 @@ public sealed class SaveFile : BaseFormat
 		World:          'WRLD', below
 		then Scripts 'SPSC', Particles 'PART', MsgCntr 'MESS', Clock 'CLOK', VanillaTime 'VANT', GameSystem 'GSYS',
 		RideSystem 'RSYS', TrackRides 'TRAK', FlyingRides 'FLYR', 'RSSE', Camera 'KAME', Coasters 'COAS',
-		Advisor 'ADVS', Sound 'SOUN', Cheat 'CHTS', AdvisorScoring 'ADSC', UI
+		Advisor 'ADVS', Sound 'SOUN', Cheat 'CHTS', AdvisorScoring 'ADSC', UI (to the end of the data)
 
 	World
 		64 bytes:   header (see ReadHeader)
@@ -173,9 +173,8 @@ public sealed class SaveFile : BaseFormat
 		ReadMap( reader );
 		ReadThings( reader );
 
-		var tag = reader.ReadUInt32();
-		if ( tag != 0x57524C44 )
-			throw new Exception( $"World module did not end with its tag: {tag:X8}" );
+		ExpectTag( reader, "WRLD" );
+		ReadModules( reader );
 	}
 
 	private void ReadHeader( BinaryReader reader )
