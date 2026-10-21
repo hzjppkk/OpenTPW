@@ -35,8 +35,13 @@ public partial class Material : Asset
 	}
 
 	protected Material( string shaderPath, Type uniformBufferType, MaterialFlags flags = MaterialFlags.None )
+		: this( new Shader( shaderPath ), uniformBufferType, flags )
 	{
-		Shader = new Shader( shaderPath );
+	}
+
+	protected Material( Shader shader, Type uniformBufferType, MaterialFlags flags = MaterialFlags.None )
+	{
+		Shader = shader;
 		Shader.OnRecompile += () => SetupResources( flags );
 		UniformBufferType = uniformBufferType;
 
@@ -237,4 +242,8 @@ public partial class Material : Asset
 	}
 }
 
-public class Material<T>( string shaderPath, MaterialFlags flags = MaterialFlags.None ) : Material( shaderPath, typeof( T ), flags );
+public class Material<T> : Material
+{
+	public Material( string shaderPath, MaterialFlags flags = MaterialFlags.None ) : base( shaderPath, typeof( T ), flags ) { }
+	public Material( Shader shader, MaterialFlags flags = MaterialFlags.None ) : base( shader, typeof( T ), flags ) { }
+}
