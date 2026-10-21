@@ -8,6 +8,7 @@ public class Level
 
 	public RootPanel Hud { get; set; }
 	public Sun SunLight { get; set; }
+	public LobbyConfig? Lobby { get; private set; }
 	public Sky? EnvironmentSky { get; private set; }
 
 	public SettingsFile Global { get; private init; }
@@ -26,12 +27,16 @@ public class Level
 		SunLight = new Sun() { Position = new( 0, 100, 100 ) };
 
 		_ = new Water() { Scale = new Vector3( 10000f ) };
-		EnvironmentSky = new Sky();
-
-		_ = new LobbyIsland( new Vector3( 400, 400, 0 ), "Jungle" );
-		_ = new LobbyIsland( new Vector3( 600, 400, 0 ), "Hallow" );
-		_ = new LobbyIsland( new Vector3( 600, 600, 0 ), "Fantasy" );
-		_ = new LobbyIsland( new Vector3( 400, 600, 0 ), "Space" );
+		var sky = new Sky();
+		EnvironmentSky = sky;
+		Lobby = LobbyConfig.Load();
+		LobbyCameraMode.Configure( Lobby );
+		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby );
+		foreach ( var island in Lobby.Islands )
+		{
+			var center = Lobby.CameraPositions[island.Id];
+			_ = new LobbyIsland( new Vector3( center.X, center.Y, 0 ), island );
+		}
 
 		Camera.SetCameraMode<LobbyCameraMode>();
 	}
@@ -48,7 +53,9 @@ public class Level
 
 	public void Update()
 	{
-		Entity.All.ForEach( entity => entity.Update() );
+		// Flocks can add model entities while replenishing their actor list.
+		foreach ( var entity in Entity.All.ToArray() ) entity.Update();
+		if ( Lobby != null ) LobbyNavigation.Draw( Lobby );
 	}
 
 	public void Render()

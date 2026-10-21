@@ -184,6 +184,8 @@ public partial class Renderer
 			Editor.Instance.shouldRender = !Editor.Instance.shouldRender;
 		if ( Editor.Instance.shouldRender )
 			Editor.Instance.UpdateFrom( inputSnapshot );
+		else
+			imGuiRenderer.Update( Math.Max( deltaTime, 0.001f ), inputSnapshot );
 
 		PreRender();
 		PreUpdate?.Invoke();
