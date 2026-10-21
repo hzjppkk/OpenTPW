@@ -11,13 +11,26 @@ public class Level
 
 	public SettingsFile Global { get; private init; }
 
-	public Level( string levelName )
+	public Level( string levelName, bool previewPark = false )
 	{
 		Global = new SettingsFile( $"/levels/{levelName}/global.sam" );
 		Current = this;
 
-		SetupEntities();
-		SetupHud();
+		if ( previewPark )
+		{
+			SunLight = new Sun() { Position = new( 0, 100, 100 ) };
+			_ = new Sky();
+			var park = new SavedPark( levelName );
+			SavedParkCameraMode.Target = park.CameraTarget;
+			Camera.SetCameraMode<SavedParkCameraMode>();
+			Hud = new();
+			Hud.AddChild( new Cursor() );
+		}
+		else
+		{
+			SetupEntities();
+			SetupHud();
+		}
 	}
 
 	private void SetupEntities()

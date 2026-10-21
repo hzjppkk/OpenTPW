@@ -43,7 +43,10 @@ internal static class Game
 		//
 		// Create level
 		//
-		var level = new Level( "jungle" );
+		bool previewPark = args.Length == 2 && args[0] == "--park";
+		if ( args.Length != 0 && !previewPark )
+			throw new ArgumentException( "Usage: OpenTPW [--park <level>]" );
+		var level = new Level( previewPark ? args[1] : "jungle", previewPark );
 
 		//
 		// Run game loop
