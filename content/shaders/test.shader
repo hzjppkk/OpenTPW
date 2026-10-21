@@ -13,6 +13,7 @@ vertex {
         vec3 g_vLightColor;
         vec3 g_vCameraPos;
         float g_flTime;
+        vec4 g_vFogColor;
     } g_oUbo;
 
     layout(location = 0) out VS_OUT {
@@ -28,7 +29,7 @@ vertex {
     void main() {
         vs_out.vTexCoords = texCoords;
         vs_out.vTexCoords.y = 1.0 - vs_out.vTexCoords.y;
-        vs_out.vNormal = normal;
+        vs_out.vNormal = mat3(transpose(inverse(g_oUbo.g_mModel))) * normal;
         vs_out.vPosition = vec3(g_oUbo.g_mModel * vec4(position, 1.0));
 
         vec4 pos = g_oUbo.g_mModel * vec4(position, 1.0);
@@ -61,6 +62,7 @@ fragment {
         vec3 g_vLightColor;
         vec3 g_vCameraPos;
         float g_flTime;
+        vec4 g_vFogColor;
     } g_oUbo;
 
     layout( set = 1, binding = 0 ) uniform texture2D Color0;
@@ -101,7 +103,7 @@ fragment {
         }*/
 
         vec3 N = normalize(vs_out.vNormal);
-        vec3 L = normalize(g_oUbo.g_vLightPos - vs_out.vWorldPosition);
+        vec3 L = normalize(g_oUbo.g_vLightPos - vs_out.vPosition);
         
         vec3 vDiffuse = max(dot(N, L), 0.0) * g_oUbo.g_vLightColor;
         vec3 vAmbient = vec3(0.4);
@@ -146,6 +148,6 @@ fragment {
         fogFactor = clamp( fogFactor, 0, 1 );
         
         // Mix with fog
-        fragColor.xyz = mix(fragColor.xyz, vec3( 0.301, 0.84, 1 ), fogFactor);
+        fragColor.xyz = mix(fragColor.xyz, g_oUbo.g_vFogColor.xyz, fogFactor);
     }
 }

@@ -8,6 +8,7 @@ public class Level
 
 	public RootPanel Hud { get; set; }
 	public Sun SunLight { get; set; }
+	public Sky? EnvironmentSky { get; private set; }
 
 	public SettingsFile Global { get; private init; }
 
@@ -25,7 +26,7 @@ public class Level
 		SunLight = new Sun() { Position = new( 0, 100, 100 ) };
 
 		_ = new Water() { Scale = new Vector3( 10000f ) };
-		_ = new Sky();
+		EnvironmentSky = new Sky();
 
 		_ = new LobbyIsland( new Vector3( 400, 400, 0 ), "Jungle" );
 		_ = new LobbyIsland( new Vector3( 600, 400, 0 ), "Hallow" );
