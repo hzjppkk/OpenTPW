@@ -18,15 +18,17 @@ public class SaveModuleTests
 	[TestMethod]
 	public void EverySaveInTheSavesPathEndsEveryModuleOnItsTag()
 	{
-		var directory = Environment.GetEnvironmentVariable( "OPENTPW_SAVES_PATH" );
-		if ( string.IsNullOrEmpty( directory ) || !Directory.Exists( directory ) )
-			Assert.Inconclusive( "OPENTPW_SAVES_PATH is not set to a directory" );
+		if ( SampleSaves.Find() is not string directory )
+		{
+			Assert.Inconclusive( $"No samples/saves folder found from {Environment.CurrentDirectory}" );
+			return;
+		}
 
 		var saves = Directory.GetFiles( directory )
 			.Where( x => new[] { ".tpws", ".tpwi", ".ints" }.Contains( Path.GetExtension( x ).ToLowerInvariant() ) )
 			.ToList();
 		if ( saves.Count == 0 )
-			Assert.Inconclusive( "No saves in OPENTPW_SAVES_PATH" );
+			Assert.Inconclusive( $"No saves in {directory}" );
 
 		var failures = new List<string>();
 		foreach ( var path in saves )
