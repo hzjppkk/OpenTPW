@@ -6,71 +6,51 @@ public sealed class LobbyFlock : Entity
 	private sealed class Actor
 	{
 		public LobbyModel Model = null!;
-		public Vector3 Direction;
-		public Vector3 Target;
 	}
 
 	private readonly List<Actor> actors = new();
 	private readonly LobbyFlyingMeshConfig config;
 	private readonly Vector3 center;
 	private readonly Vector3 extents;
-	private uint random;
 	private readonly LobbyQuality quality;
+	private readonly LobbyFlockSimulation simulation;
 	public int QualityPercent { get; set; }
 	public int ActorCount => actors.Count;
 
 	public LobbyFlock( LobbyFlyingMeshConfig config, Vector3 islandPosition, int qualityPercent, uint seed, LobbyQuality? quality = null )
+		: this( config, islandPosition, qualityPercent, new LobbyRandom( seed ), quality ) { }
+
+	internal LobbyFlock( LobbyFlyingMeshConfig config, Vector3 islandPosition, int qualityPercent, LobbyRandom random, LobbyQuality? quality = null )
 	{
 		this.config = config;
 		this.quality = quality ?? LobbyQuality.Load();
 		center = islandPosition + new Vector3( 0, 0, 50 );
 		extents = new Vector3( config.Extents.X, config.Extents.Z, config.Extents.Y );
 		QualityPercent = qualityPercent;
-		random = seed;
+		simulation = new LobbyFlockSimulation( config, center, extents, random );
 	}
-
-	private uint Next()
-	{
-		random = unchecked( random * 0x19660d + 0x3c6ef35f );
-		random = (random >> 13) | (random << 19);
-		return random;
-	}
-	private float Unit() => (Next() & 0x3fffffff) * (1f / 1073741824f);
-	private Vector3 Point() => center + new Vector3( Unit() - 0.5f, Unit() - 0.5f, Unit() - 0.5f ) * extents;
 
 	protected override void OnUpdate()
 	{
-		int count = config.CountAtQuality( QualityPercent );
-		while ( actors.Count > count )
+		simulation.Update( RetailTime.FrameTicks, QualityPercent );
+		while ( actors.Count > simulation.Actors.Count )
 		{
 			var actor = actors[^1];
 			actor.Model.Delete();
 			All.Remove( actor.Model );
 			actors.RemoveAt( actors.Count - 1 );
 		}
-		while ( actors.Count < count )
+		for ( int i = 0; i < simulation.Actors.Count; i++ )
 		{
-			var position = Point();
-			var target = Point();
-			// FUN_005d4900 -> FUN_005d3430( 0, 1 ): slot M, segment 0, looped.
-			var animation = AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, 0 );
-			actors.Add( new Actor
+			var state = simulation.Actors[i];
+			if ( i == actors.Count )
 			{
-				Model = new LobbyModel( position, AnimationFiles.ResolveModel( config.ModelPath ),
-					$"{config.ResourceDirectory}/textures", animation, quality: quality ),
-				Direction = (target - position).Normal,
-				Target = target
-			} );
-			if ( (Next() & 7) == 0 ) break;
-		}
-		float dt = RetailTime.FrameTicks;
-		foreach ( var actor in actors )
-		{
-			var ideal = (actor.Target - actor.Model.Position).Normal;
-			actor.Direction = (actor.Direction + (ideal - actor.Direction) * dt * 0.1f).Normal;
-			actor.Model.Position += actor.Direction * config.Speed * dt;
-			actor.Model.Rotation = Facing( actor.Direction );
-			if ( (actor.Target - actor.Model.Position).LengthSquared < 500 ) actor.Target = Point();
+				var animation = AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, 0 );
+				actors.Add( new Actor { Model = new LobbyModel( state.Position, config.ModelPath,
+					$"{config.ResourceDirectory}/textures", animation, quality: quality ) } );
+			}
+			actors[i].Model.Position = state.Position;
+			actors[i].Model.Rotation = Facing( state.Direction );
 		}
 	}
 
@@ -85,5 +65,70 @@ public sealed class LobbyFlock : Entity
 		return System.Numerics.Quaternion.CreateFromRotationMatrix( new System.Numerics.Matrix4x4(
 			right.X, right.Y, right.Z, 0, forward.X, forward.Y, forward.Z, 0,
 			up.X, up.Y, up.Z, 0, 0, 0, 0, 1 ) );
+	}
+}
+
+/// <summary>One stream is shared by the lobby, as at TP.exe lobby +0x34.</summary>
+internal sealed class LobbyRandom
+{
+	internal uint State { get; private set; }
+	internal LobbyRandom( uint seed ) => State = seed;
+	internal uint Next()
+	{
+		uint value = unchecked( State * 0x19660d + 0x3c6ef35f );
+		return State = (value >> 13) | (value << 19);
+	}
+	private float Unit() => (Next() & 0x3fffffff) * (1f / 1073741824f);
+	internal Vector3 Point( Vector3 center, Vector3 extents )
+	{
+		// Consume retail X,Y,Z, then swap Y/Z into the modern coordinate system.
+		float x = Unit(), z = Unit(), y = Unit();
+		return new Vector3( x * extents.X - extents.X * 0.5f + center.X,
+			y * extents.Y - extents.Y * 0.5f + center.Y,
+			z * extents.Z - extents.Z * 0.5f + center.Z );
+	}
+}
+
+/// <summary>0x5d4900 / 0x5d4c20 / 0x5d50f0 without rendering dependencies.</summary>
+internal sealed class LobbyFlockSimulation
+{
+	internal sealed class Actor
+	{
+		internal Vector3 Position;
+		internal Vector3 Direction;
+		internal Vector3 Target;
+	}
+	internal List<Actor> Actors { get; } = new();
+	private readonly LobbyFlyingMeshConfig config;
+	private readonly Vector3 center;
+	private readonly Vector3 extents;
+	private readonly LobbyRandom random;
+	internal LobbyFlockSimulation( LobbyFlyingMeshConfig config, Vector3 center, Vector3 extents, LobbyRandom random )
+	{
+		this.config = config;
+		this.center = center;
+		this.extents = extents;
+		this.random = random;
+	}
+	internal void Update( float dt, int qualityPercent )
+	{
+		int count = config.CountAtQuality( qualityPercent );
+		if ( Actors.Count > count ) Actors.RemoveRange( count, Actors.Count - count );
+		while ( Actors.Count < count )
+		{
+			var position = random.Point( center, extents );
+			var target = random.Point( center, extents );
+			Actors.Add( new Actor { Position = position, Target = target, Direction = (target - position).Normal } );
+			// The final actor consumes no replenishment draw; retail stops on 1, not 0.
+			if ( Actors.Count < count && (random.Next() & 7) == 1 ) break;
+		}
+		foreach ( var actor in Actors )
+		{
+			var ideal = (actor.Target - actor.Position).Normal;
+			actor.Direction = (actor.Direction + (ideal - actor.Direction) * (dt * 0.1f)).Normal;
+			actor.Position += actor.Direction * (config.Speed * dt);
+			if ( (actor.Target - actor.Position).LengthSquared < 500 )
+				actor.Target = random.Point( center, extents );
+		}
 	}
 }

@@ -11,6 +11,9 @@ public sealed class LobbyIsland : Entity
 	private int animationIndex;
 
 	public LobbyIsland( Vector3 position, LobbyIslandConfig config, LobbyQuality? quality = null )
+		: this( position, config, quality, new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) ) ) { }
+
+	internal LobbyIsland( Vector3 position, LobbyIslandConfig config, LobbyQuality? quality, LobbyRandom random )
 	{
 		quality ??= LobbyQuality.Load();
 		var placement = GetPlacement( position, config );
@@ -26,9 +29,8 @@ public sealed class LobbyIsland : Entity
 		gate = new LobbyModel( Position, config.GateModelPath, textures, textureResolver:
 			name => LobbySigns.Resolve( config.GateModelPath, name, config.Name ), quality: quality ) { Rotation = Rotation };
 		gate.Play( AnimationFiles.Resolve( config.GateModelPath, AnimationSlot.M, 0 ) );
-		uint seed = (uint)(config.Id + 1) * 0x12345u;
 		foreach ( var mesh in config.FlyingMeshes )
-			_ = new LobbyFlock( mesh, placement.Target, quality.ObjectsPercent, seed++, quality );
+			_ = new LobbyFlock( mesh, placement.Target, quality.ObjectsPercent, random, quality );
 	}
 
 	internal static (Vector3 Position, Vector3 Target, Quaternion Rotation) GetPlacement( Vector3 position, LobbyIslandConfig config )

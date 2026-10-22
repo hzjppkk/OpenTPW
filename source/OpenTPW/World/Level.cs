@@ -32,10 +32,11 @@ public class Level
 		Lobby = LobbyConfig.Load();
 		LobbyCameraMode.Configure( Lobby );
 		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby );
+		var lobbyRandom = new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
 		foreach ( var island in Lobby.Islands )
 		{
 			var center = Lobby.CameraPositions[island.Id];
-			_ = new LobbyIsland( new Vector3( center.X, center.Y, 0 ), island );
+			_ = new LobbyIsland( new Vector3( center.X, center.Y, 0 ), island, null, lobbyRandom );
 		}
 
 		Camera.SetCameraMode<LobbyCameraMode>();
