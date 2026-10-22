@@ -50,11 +50,12 @@ public sealed class LobbyFlock : Entity
 		{
 			var position = Point();
 			var target = Point();
-			var animation = $"{config.ResourceDirectory}/{config.ModelName}M.md2";
+			// FUN_005d4900 -> FUN_005d3430( 0, 1 ): slot M, segment 0, looped.
+			var animation = AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, 0 );
 			actors.Add( new Actor
 			{
-				Model = new LobbyModel( position, config.ModelPath, $"{config.ResourceDirectory}/textures",
-					FileSystem.FileExists( animation ) ? animation : null ),
+				Model = new LobbyModel( position, AnimationFiles.ResolveModel( config.ModelPath ),
+					$"{config.ResourceDirectory}/textures", animation ),
 				Direction = (target - position).Normal,
 				Target = target
 			} );

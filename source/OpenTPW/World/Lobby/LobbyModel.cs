@@ -34,6 +34,8 @@ public sealed class LobbyModel : Entity
 	{
 		Position = position;
 		Rotation = Quaternion.Identity;
+		// A missing model throws with its full path instead of failing later on a null stream.
+		modelPath = AnimationFiles.ResolveModel( modelPath );
 		if ( !ModelCache.TryGetValue( modelPath, out var loadedModel ) )
 			ModelCache[modelPath] = loadedModel = new ModelFile( modelPath );
 		modelFile = loadedModel;
@@ -83,9 +85,13 @@ public sealed class LobbyModel : Entity
 			Play( animationPath );
 	}
 
-	/// <summary>Starts the exact animation file, including a slot's unnumbered (segment zero) file.</summary>
+	/// <summary>
+	/// Starts an animation file, normally one returned by <see cref="AnimationFiles.Resolve"/> or
+	/// <see cref="AnimationFiles.Segments"/>. A missing file throws with its full path.
+	/// </summary>
 	public void Play( string animationPath, bool loop = true )
 	{
+		animationPath = AnimationFiles.ResolveFile( animationPath, "Animation" );
 		if ( !AnimationCache.TryGetValue( animationPath, out animation ) )
 			AnimationCache[animationPath] = animation = new ModelAnimation( animationPath );
 		Loop = loop;
