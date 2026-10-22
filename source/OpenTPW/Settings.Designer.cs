@@ -58,5 +58,12 @@ namespace OpenTPW {
                 this["PreferredBackend"] = value;
             }
         }
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("med")]
+        public string LobbyQuality {
+            get { return ((string)(this["LobbyQuality"])); }
+            set { this["LobbyQuality"] = value; }
+        }
     }
 }

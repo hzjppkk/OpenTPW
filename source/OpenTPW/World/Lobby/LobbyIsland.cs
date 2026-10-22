@@ -10,8 +10,9 @@ public sealed class LobbyIsland : Entity
 	private readonly string[] islandAnimations;
 	private int animationIndex;
 
-	public LobbyIsland( Vector3 position, LobbyIslandConfig config )
+	public LobbyIsland( Vector3 position, LobbyIslandConfig config, LobbyQuality? quality = null )
 	{
+		quality ??= LobbyQuality.Load();
 		var placement = GetPlacement( position, config );
 		Position = placement.Position;
 		Rotation = placement.Rotation;
@@ -20,14 +21,14 @@ public sealed class LobbyIsland : Entity
 		// A configured island requires segment zero; missing animation is a data error.
 		_ = AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, 0 );
 		island = new LobbyModel( Position, config.ModelPath, textures, textureResolver:
-			name => LobbySigns.Resolve( config.ModelPath, name, config.Name ) ) { Rotation = Rotation };
+			name => LobbySigns.Resolve( config.ModelPath, name, config.Name ), quality: quality ) { Rotation = Rotation };
 		if ( islandAnimations.Length > 0 ) island.Play( islandAnimations[0], false );
 		gate = new LobbyModel( Position, config.GateModelPath, textures, textureResolver:
-			name => LobbySigns.Resolve( config.GateModelPath, name, config.Name ) ) { Rotation = Rotation };
+			name => LobbySigns.Resolve( config.GateModelPath, name, config.Name ), quality: quality ) { Rotation = Rotation };
 		gate.Play( AnimationFiles.Resolve( config.GateModelPath, AnimationSlot.M, 0 ) );
 		uint seed = (uint)(config.Id + 1) * 0x12345u;
 		foreach ( var mesh in config.FlyingMeshes )
-			_ = new LobbyFlock( mesh, placement.Target, 70, seed++ );
+			_ = new LobbyFlock( mesh, placement.Target, quality.ObjectsPercent, seed++, quality );
 	}
 
 	internal static (Vector3 Position, Vector3 Target, Quaternion Rotation) GetPlacement( Vector3 position, LobbyIslandConfig config )

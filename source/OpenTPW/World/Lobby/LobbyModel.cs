@@ -30,9 +30,10 @@ public sealed class LobbyModel : Entity
 	public bool AnimationFinished { get; private set; }
 	public bool Visible { get; set; } = true;
 
-	public LobbyModel( Vector3 position, string modelPath, string textureDirectory, string? animationPath = null, Func<string, Texture?>? textureResolver = null )
+	public LobbyModel( Vector3 position, string modelPath, string textureDirectory, string? animationPath = null, Func<string, Texture?>? textureResolver = null, LobbyQuality? quality = null )
 	{
 		Position = position;
+		textureDirectory = (quality ?? LobbyQuality.Load()).TextureDirectory( textureDirectory );
 		Rotation = Quaternion.Identity;
 		// A missing model throws with its full path instead of failing later on a null stream.
 		modelPath = AnimationFiles.ResolveModel( modelPath );
@@ -56,7 +57,7 @@ public sealed class LobbyModel : Entity
 					var texture = textureResolver?.Invoke( name );
 					if ( texture == null )
 					{
-						string texturePath = $"{textureDirectory}/{name}.wct";
+						string texturePath = AnimationFiles.ResolveFile( $"{textureDirectory}/{name}.wct", "Texture" );
 						if ( !TextureCache.TryGetValue( texturePath, out texture ) )
 							TextureCache[texturePath] = texture = new Texture( texturePath, TextureFlags.Repeat );
 					}

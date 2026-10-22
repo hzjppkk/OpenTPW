@@ -11,5 +11,8 @@
     <Setting Name="PreferredBackend" Type="System.String" Scope="User">
       <Value Profile="(Default)">Vulkan</Value>
     </Setting>
+    <Setting Name="LobbyQuality" Type="System.String" Scope="User">
+      <Value Profile="(Default)">med</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

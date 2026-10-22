@@ -15,12 +15,14 @@ public sealed class LobbyFlock : Entity
 	private readonly Vector3 center;
 	private readonly Vector3 extents;
 	private uint random;
+	private readonly LobbyQuality quality;
 	public int QualityPercent { get; set; }
 	public int ActorCount => actors.Count;
 
-	public LobbyFlock( LobbyFlyingMeshConfig config, Vector3 islandPosition, int qualityPercent, uint seed )
+	public LobbyFlock( LobbyFlyingMeshConfig config, Vector3 islandPosition, int qualityPercent, uint seed, LobbyQuality? quality = null )
 	{
 		this.config = config;
+		this.quality = quality ?? LobbyQuality.Load();
 		center = islandPosition + new Vector3( 0, 0, 50 );
 		extents = new Vector3( config.Extents.X, config.Extents.Z, config.Extents.Y );
 		QualityPercent = qualityPercent;
@@ -55,7 +57,7 @@ public sealed class LobbyFlock : Entity
 			actors.Add( new Actor
 			{
 				Model = new LobbyModel( position, AnimationFiles.ResolveModel( config.ModelPath ),
-					$"{config.ResourceDirectory}/textures", animation ),
+					$"{config.ResourceDirectory}/textures", animation, quality: quality ),
 				Direction = (target - position).Normal,
 				Target = target
 			} );
