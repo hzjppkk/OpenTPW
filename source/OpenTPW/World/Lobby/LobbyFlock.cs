@@ -61,7 +61,7 @@ public sealed class LobbyFlock : Entity
 			} );
 			if ( (Next() & 7) == 0 ) break;
 		}
-		float dt = Math.Clamp( Time.Delta * 10, 0, 5 );
+		float dt = RetailTime.FrameTicks;
 		foreach ( var actor in actors )
 		{
 			var ideal = (actor.Target - actor.Model.Position).Normal;

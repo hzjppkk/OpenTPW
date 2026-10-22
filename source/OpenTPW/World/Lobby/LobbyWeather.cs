@@ -47,7 +47,7 @@ public sealed class LobbyWeather : ModelEntity
 		var island = currentIsland();
 		if ( island == null ) return;
 		if ( previousIsland != island.Id ) { flash = 0; previousIsland = island.Id; }
-		flash = Math.Max( 0, flash - Time.Delta );
+		flash = Math.Max( 0, flash - RetailTime.FrameSeconds );
 		// FUN_005db430: mask the rotated LCG once per frame; 63 gives one chance in 64.
 		if ( island.Lightning > 0 && (Next() & (uint)island.Lightning) == 1 )
 		{
@@ -80,7 +80,7 @@ public sealed class LobbyWeather : ModelEntity
 		var right = Camera.Rotation.Right;
 		for ( int i = 0; i < RainAmount; i++ )
 		{
-			drops[i].Z -= Math.Clamp( Time.Delta, 0, 0.5f ) * 110;
+			drops[i].Z -= RetailTime.FrameSeconds * 110;
 			if ( drops[i].Z < -35 ) drops[i].Z += 130;
 			var p = Camera.Position + drops[i];
 			Ribbon( i * 6, p, p + new Vector3( -0.3f, 0, 2.7f ), right * 0.04f );
