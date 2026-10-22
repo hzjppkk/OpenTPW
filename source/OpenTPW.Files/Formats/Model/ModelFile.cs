@@ -48,6 +48,17 @@ public partial class ModelFile : BaseFormat
 		public uint[] Indices { get; set; }
 
 		/// <summary>
+		/// Positions as stored, before <see cref="VertexOrder"/> expands them into <see cref="Vertices"/>.
+		/// Vertex animation addresses these.
+		/// </summary>
+		public Vector3[] RawPositions { get; set; }
+
+		/// <summary>
+		/// For each entry in <see cref="Vertices"/>, the index of its position in <see cref="RawPositions"/>.
+		/// </summary>
+		public ushort[] VertexOrder { get; set; }
+
+		/// <summary>
 		/// Texture coordinates as stored. V runs bottom-up relative to the image that
 		/// <see cref="TextureFile"/> decodes, so sample at (u, 1 - v).
 		/// </summary>
@@ -453,6 +464,8 @@ public partial class ModelFile : BaseFormat
 				}
 
 				mesh.Vertices = reorderedVertices;
+				mesh.RawPositions = vertices.ToArray();
+				mesh.VertexOrder = vertexOrder;
 
 				// Parse face data
 				reader.BaseStream.Seek( mesh.FaceOffset, SeekOrigin.Begin );
