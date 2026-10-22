@@ -62,6 +62,13 @@ public class Level
 	{
 		Camera.Update();
 
-		Entity.All.ForEach( entity => entity.Render() );
+		// Retail registers screen-space UI models separately (TP.exe 0x474eb0 ->
+		// 0x45a960, list mask 0x20; screen transform at 0x474f10).
+		// Keep the OpenTPW HUD out of world creation order as well.
+		foreach ( var entity in Entity.InRenderOrder( Entity.All ) )
+		{
+			// Material.UI disables depth testing and writes, so world depth cannot hide the HUD.
+			entity.Render();
+		}
 	}
 }

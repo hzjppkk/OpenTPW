@@ -10,6 +10,7 @@ public class RootPanel : Entity
 	public RootPanel()
 	{
 		Instance ??= this;
+		Layer = RenderLayer.Ui;
 	}
 
 	protected override void OnRender()
