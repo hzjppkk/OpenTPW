@@ -40,6 +40,20 @@ public class RenderLayerTests
 		protected override void OnRender() => Draw?.Invoke();
 	}
 
+	private sealed class BackgroundProbe : Entity
+	{
+		public BackgroundProbe() => Layer = RenderLayer.Background;
+	}
+
+	[TestMethod]
+	public void SkyBackgroundRendersBeforeWaterEvenWhenCreatedLater()
+	{
+		var water = new WorldProbe();
+		var hud = new UiProbe();
+		var sky = new BackgroundProbe();
+		CollectionAssert.AreEqual( new Entity[] { sky, water, hud }, Entity.InRenderOrder( Entity.All ) );
+	}
+
 	[TestMethod]
 	public void RootPanelIsUiLayerAndEntitiesDefaultToWorld()
 	{

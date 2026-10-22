@@ -8,6 +8,7 @@ public sealed class LobbyQuality
 	public string Preset { get; }
 	public int ObjectsPercent { get; }
 	public int TextureQuality { get; }
+	public int SkyLayers { get; }
 	public bool WeatherEnabled { get; }
 	public bool UseSmallTextures => TextureQuality <= 1;
 
@@ -16,6 +17,8 @@ public sealed class LobbyQuality
 		Preset = preset;
 		ObjectsPercent = Read( settings, "GameOptions.LOBBYOBJECTS", 0, 100 );
 		TextureQuality = Read( settings, "GraphicalOptions.TEXTUREQUALITY", 0, 3 );
+		SkyLayers = Read( settings, "GraphicalOptions.SKYQUALITY", 0, 4 );
+		if ( SkyLayers == 3 ) throw new InvalidDataException( "SKYQUALITY must be 0, 1, 2 or 4." );
 		WeatherEnabled = Read( settings, "GameOptions.WEATHER", 0, 1 ) != 0;
 	}
 

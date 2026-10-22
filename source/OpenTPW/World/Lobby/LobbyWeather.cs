@@ -62,9 +62,9 @@ public sealed class LobbyWeather : ModelEntity
 			}
 			flash = 0.12f;
 		}
-		Vector3 color = island.SkyColour / 255f;
+		sky.SetIslandColour( island.SkyColour );
 		float strength = flash > 0 ? flash / 0.12f * 0.65f : 0;
-		sky.SetColor( color * (1 - strength) + Vector3.One * strength );
+		sky.SetFlash( strength );
 
 		var rainy = config?.Islands.Where( x => x.Rainy ).ToArray() ?? (island.Rainy ? new[] { island } : Array.Empty<LobbyIslandConfig>());
 		double meanSquaredDistance = 0;

@@ -11,6 +11,7 @@ namespace OpenTPW;
 /// </summary>
 public enum RenderLayer
 {
+	Background = -1,
 	World = 0,
 	Ui = 1
 }

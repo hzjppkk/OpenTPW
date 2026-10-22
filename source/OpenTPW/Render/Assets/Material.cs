@@ -11,7 +11,8 @@ public enum MaterialFlags
 	DisableDepthTest,
 	DisableDepthWrite,
 
-	DisableDepth = DisableDepthTest | DisableDepthWrite
+	DisableDepth = DisableDepthTest | DisableDepthWrite,
+	DisableCulling = 4
 }
 
 public partial class Material : Asset
@@ -222,7 +223,7 @@ public partial class Material : Asset
 			),
 
 			RasterizerState = new RasterizerStateDescription(
-				FaceCullMode.Back,
+				flags.HasFlag( MaterialFlags.DisableCulling ) ? FaceCullMode.None : FaceCullMode.Back,
 				PolygonFillMode.Solid,
 				FrontFace.Clockwise,
 				true,
