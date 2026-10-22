@@ -159,6 +159,7 @@ public sealed class LobbyConfig
 public sealed record LobbyIslandConfig( int Id, string ThemeName, string ResourceDirectory, string ModelName,
 	string GateModelName, string Name, float RotationDegrees, float Height )
 {
+	// Height is the retail Y-up camera/flock anchor; the island and gate model roots stay at Y=0.
 	public string ModelPath => $"{ResourceDirectory}/{ModelName}.md2";
 	public string GateModelPath => $"{ResourceDirectory}/{GateModelName}.md2";
 	/// <summary>RGB components in the original 0..255 range.</summary>

@@ -12,8 +12,9 @@ public sealed class LobbyIsland : Entity
 
 	public LobbyIsland( Vector3 position, LobbyIslandConfig config )
 	{
-		Position = position + new Vector3( 0, 0, config.Height );
-		Rotation = Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, -config.RotationDegrees.DegreesToRadians() );
+		var placement = GetPlacement( position, config );
+		Position = placement.Position;
+		Rotation = placement.Rotation;
 		var textures = $"{config.ResourceDirectory}/textures";
 		islandAnimations = AnimationFiles.Segments( config.ModelPath, AnimationSlot.M ).ToArray();
 		// A configured island requires segment zero; missing animation is a data error.
@@ -26,7 +27,17 @@ public sealed class LobbyIsland : Entity
 		gate.Play( AnimationFiles.Resolve( config.GateModelPath, AnimationSlot.M, 0 ) );
 		uint seed = (uint)(config.Id + 1) * 0x12345u;
 		foreach ( var mesh in config.FlyingMeshes )
-			_ = new LobbyFlock( mesh, Position, 70, seed++ );
+			_ = new LobbyFlock( mesh, placement.Target, 70, seed++ );
+	}
+
+	internal static (Vector3 Position, Vector3 Target, Quaternion Rotation) GetPlacement( Vector3 position, LobbyIslandConfig config )
+	{
+		// 0x5daa20 retains the ISLAND height as the orbit/flock anchor, but sets both model roots to Y=0.
+		var modelPosition = new Vector3( position.X, position.Y, 0 );
+		var target = new Vector3( position.X, position.Y, config.Height );
+		// Retail +Y rotation becomes -Z after swapping retail Y/Z (0x5d33c0 -> 0x46ddf0).
+		var rotation = Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, -config.RotationDegrees.DegreesToRadians() );
+		return (modelPosition, target, rotation);
 	}
 
 	protected override void OnUpdate()

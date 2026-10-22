@@ -10,6 +10,48 @@ namespace OpenTPW.Tests;
 public class LobbyConfigTests
 {
 	[TestMethod]
+	public void RetailPlacementSeparatesModelRootsFromCameraAndFlockAnchors()
+	{
+		GameData.Require();
+		var lobby = LobbyConfig.Load();
+		var positions = new[] { new Vector3( 400, 400, 0 ), new Vector3( 600, 400, 0 ), new Vector3( 600, 600, 0 ), new Vector3( 400, 600, 0 ) };
+		var heights = new[] { 12.5f, 17.5f, 38f, 35f };
+		var rotatedX = new[] { -N.Vector3.UnitY, N.Vector3.UnitY, -N.Vector3.UnitX, N.Vector3.UnitX };
+		foreach ( var island in lobby.Islands )
+		{
+			var center = lobby.CameraPositions[island.Id];
+			var placement = LobbyIsland.GetPlacement( new Vector3( center.X, center.Y, 0 ), island );
+			Assert.AreEqual( positions[island.Id], placement.Position, island.ThemeName );
+			Assert.AreEqual( heights[island.Id], placement.Target.Z, island.ThemeName );
+			Assert.AreEqual( placement.Position.X, placement.Target.X );
+			Assert.AreEqual( placement.Position.Y, placement.Target.Y );
+			Assert.IsTrue( N.Vector3.Distance( N.Vector3.Transform( N.Vector3.UnitX, placement.Rotation ), rotatedX[island.Id] ) < 0.00001f, island.ThemeName );
+		}
+	}
+
+	[TestMethod]
+	public void RetailThemeEnvironmentAndFlyingMeshesKeepTheirConfiguredValues()
+	{
+		GameData.Require();
+		var islands = LobbyConfig.Load().Islands;
+		var sky = new[] { new N.Vector3( 243, 203, 191 ), new N.Vector3( 5, 170, 255 ), new N.Vector3( 4, 44, 12 ), new N.Vector3( 125, 8, 8 ) };
+		for ( int i = 0; i < 4; i++ )
+		{
+			Assert.AreEqual( i, islands[i].Id );
+			Assert.AreEqual( sky[i], islands[i].SkyColour );
+			Assert.AreEqual( i == 2, islands[i].Rainy );
+			Assert.AreEqual( i == 2 ? 63 : 0, islands[i].Lightning );
+		}
+		CollectionAssert.AreEqual( new[] { 10, 10 }, islands[0].FlyingMeshes.Select( mesh => mesh.Count ).ToArray() );
+		CollectionAssert.AreEqual( new[] { 1.5f, 1.5f }, islands[0].FlyingMeshes.Select( mesh => mesh.Speed ).ToArray() );
+		Assert.IsTrue( islands[0].FlyingMeshes.All( mesh => mesh.Extents == new N.Vector3( 200, 100, 200 ) ) );
+		Assert.AreEqual( 0, islands[1].FlyingMeshes.Count );
+		Assert.AreEqual( 1, islands[2].FlyingMeshes.Count );
+		Assert.AreEqual( 50, islands[2].FlyingMeshes[0].Count );
+		Assert.AreEqual( 0, islands[3].FlyingMeshes.Count );
+	}
+
+	[TestMethod]
 	public void RetailLobbyLoadsEveryIslandAndResource()
 	{
 		GameData.Require();
