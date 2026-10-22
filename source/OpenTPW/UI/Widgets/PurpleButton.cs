@@ -7,6 +7,10 @@ internal class PurpleButton : Panel
 {
 	private Texture ButtonText1;
 	private Texture ButtonText2;
+	private Texture Label;
+	private Vector2 LabelSize;
+
+	private static FontFile Font;
 
 	public string Text { get; set; }
 
@@ -17,6 +21,13 @@ internal class PurpleButton : Panel
 
 		Text = Localization.Parse( text );
 		Log.Info( $"Parsed '{text}' as '{Text}'" );
+
+		Font ??= new FontFile( "Language/English/GAME12.bf4" );
+		var label = Font.RenderString( Text );
+		Label = new Texture( label.Data, label.Width, label.Height, TextureFlags.PointFilter );
+
+		// The game's UI is laid out for 640x480; this one for 1280x720
+		LabelSize = new Vector2( label.Width, label.Height ) * 2;
 	}
 
 	protected override void OnRender()
@@ -49,5 +60,12 @@ internal class PurpleButton : Panel
 		rect.X += 200;
 		material.Set( "Color", ButtonText2 );
 		Graphics.Quad( rect, uvs.Shift( new Vector2( 0f, 0.50f ) ), material );
+
+		//
+		// Label
+		//
+		var labelRect = new Rectangle( position + new Vector2( -500, -95 - LabelSize.Y / 2 ), LabelSize );
+		material.Set( "Color", Label );
+		Graphics.Quad( labelRect, new Rectangle( 0, 0, 1, 1 ), material );
 	}
 }
