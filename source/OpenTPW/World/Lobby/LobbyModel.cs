@@ -57,8 +57,18 @@ public sealed class LobbyModel : Entity
 					var texture = textureResolver?.Invoke( name );
 					if ( texture == null )
 					{
-						string texturePath = AnimationFiles.ResolveFile( $"{textureDirectory}/{name}.wct", "Texture" );
-						if ( !TextureCache.TryGetValue( texturePath, out texture ) )
+						string texturePath = $"{textureDirectory}/{name}.wct";
+						try
+						{
+							texturePath = AnimationFiles.ResolveFile( texturePath, "Texture" );
+						}
+						catch ( FileNotFoundException ) when ( name.Equals( "signgrab", StringComparison.OrdinalIgnoreCase ) )
+						{
+							// This unresolved retail material has no shipped WCT; retain its visible placeholder.
+							Log.Warning( $"Unimplemented lobby material {name} in {modelPath}: {texturePath}" );
+							texture = Texture.Missing;
+						}
+						if ( texture == null && !TextureCache.TryGetValue( texturePath, out texture ) )
 							TextureCache[texturePath] = texture = new Texture( texturePath, TextureFlags.Repeat );
 					}
 					textures[i] = texture;
