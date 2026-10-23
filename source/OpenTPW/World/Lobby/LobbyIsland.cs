@@ -6,9 +6,9 @@ namespace OpenTPW;
 public sealed class LobbyIsland : Entity
 {
 	private readonly LobbyModel island;
-	private readonly LobbyModel gate;
+	public LobbyGate Gate { get; }
 	private readonly string[] islandAnimations;
-	private int animationIndex;
+	private bool islandAnimationStarted;
 
 	public LobbyIsland( Vector3 position, LobbyIslandConfig config, LobbyQuality? quality = null )
 		: this( position, config, quality, new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) ) ) { }
@@ -20,15 +20,12 @@ public sealed class LobbyIsland : Entity
 		Position = placement.Position;
 		Rotation = placement.Rotation;
 		var textures = $"{config.ResourceDirectory}/textures";
-		islandAnimations = AnimationFiles.Segments( config.ModelPath, AnimationSlot.M ).ToArray();
-		// A configured island requires segment zero; missing animation is a data error.
-		_ = AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, 0 );
+		// 0x5dc1aa may request either segment, so both are required.
+		islandAnimations = Enumerable.Range( 0, 2 ).Select( segment =>
+			AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, segment ) ).ToArray();
 		island = new LobbyModel( Position, config.ModelPath, textures, textureResolver:
 			name => LobbySigns.Resolve( config.ModelPath, name, config.Name ), quality: quality ) { Rotation = Rotation };
-		if ( islandAnimations.Length > 0 ) island.Play( islandAnimations[0], false );
-		gate = new LobbyModel( Position, config.GateModelPath, textures, textureResolver:
-			name => LobbySigns.Resolve( config.GateModelPath, name, config.Name ), quality: quality ) { Rotation = Rotation };
-		gate.Play( AnimationFiles.Resolve( config.GateModelPath, AnimationSlot.M, 0 ) );
+		Gate = new LobbyGate( Position, Rotation, config, quality );
 		foreach ( var mesh in config.FlyingMeshes )
 			_ = new LobbyFlock( mesh, placement.Target, quality.ObjectsPercent, random, quality );
 	}
@@ -45,10 +42,12 @@ public sealed class LobbyIsland : Entity
 
 	protected override void OnUpdate()
 	{
-		if ( islandAnimations.Length > 0 && island.AnimationFinished )
+		if ( !islandAnimationStarted || island.AnimationFinished )
 		{
-			animationIndex = (animationIndex + 1) % islandAnimations.Length;
-			island.Play( islandAnimations[animationIndex], false );
+			// 0x5dc197 selects M1 or M2 with the CRT stream, independently of the lobby LCG.
+			int segment = RetailRandom.Next() & 1;
+			island.Play( islandAnimations[segment], false );
+			islandAnimationStarted = true;
 		}
 	}
 }
