@@ -27,18 +27,13 @@ internal sealed class LobbyLayout : Layout
 			Size = new Vector2( 180f, 77.4f )
 		} );
 
-		string[] saves = [];
-		if ( SaveFileSystem.DirectoryExists( "users" ) )
-			saves = SaveFileSystem.GetDirectories( "users" );
+		var players = LobbyPlayerProfiles.Read();
 
 		for ( int i = 0; i < 4; ++i )
 		{
 			var buttonText = "#CreateNewPlayer";
 
-			if ( saves.Length > i )
-			{
-				buttonText = Path.GetFileName( saves[i] )[1..] ?? "#CreateNewPlayer";
-			}
+			if ( players[i] is { } player ) buttonText = player.Name;
 
 			var step = i * PlayerStep;
 			Hud.AddChild( new PurpleButton( buttonText,
