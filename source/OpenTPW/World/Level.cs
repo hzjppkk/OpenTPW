@@ -31,13 +31,19 @@ public class Level
 		EnvironmentSky = sky;
 		Lobby = LobbyConfig.Load();
 		var lobbyRandom = new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
-		LobbyCameraMode.Configure( Lobby );
+		LobbyCameraMode.Configure( Lobby, lobbyRandom );
 		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby, lobbyRandom );
+		var islands = new Dictionary<int, LobbyIsland>();
 		foreach ( var island in Lobby.Islands )
 		{
 			var center = Lobby.CameraPositions[island.Id];
-			_ = new LobbyIsland( new Vector3( center.X, center.Y, 0 ), island, null, lobbyRandom );
+			islands.Add( island.Id, new LobbyIsland( new Vector3( center.X, center.Y, 0 ), island, null, lobbyRandom ) );
 		}
+		LobbyCameraMode.GateAnimationRequested += ( id, entering ) =>
+		{
+			if ( entering ) islands[id].Gate.StartEntering();
+			else islands[id].Gate.StartLeaving();
+		};
 
 		Camera.SetCameraMode<LobbyCameraMode>();
 	}
