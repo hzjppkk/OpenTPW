@@ -147,19 +147,7 @@ internal sealed class LobbySkyGeometry
 	}
 	internal static ImageResult ReadTexture( string name )
 	{
-		var image = ImageResult.FromMemory( FileSystem.ReadAllBytes( Root + name ), ColorComponents.RedGreenBlueAlpha );
-		// 0x571210 -> 0x5717a0 keeps bottom-origin rows and reverses top-origin TGAs.
-		// Stb normalizes to top-origin, so reverse it to preserve retail UVs and RGB samples.
-		int stride = image.Width * 4;
-		var row = new byte[stride];
-		for ( int y = 0; y < image.Height / 2; y++ )
-		{
-			int top = y * stride, bottom = (image.Height - 1 - y) * stride;
-			Buffer.BlockCopy( image.Data, top, row, 0, stride );
-			Buffer.BlockCopy( image.Data, bottom, image.Data, top, stride );
-			Buffer.BlockCopy( row, 0, image.Data, bottom, stride );
-		}
-		return image;
+		return RetailTexturePixels.DecodeTga( FileSystem.ReadAllBytes( Root + name ) );
 	}
 	internal void Advance( float seconds )
 	{

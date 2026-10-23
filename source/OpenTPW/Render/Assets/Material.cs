@@ -12,7 +12,9 @@ public enum MaterialFlags
 	DisableDepthWrite,
 
 	DisableDepth = DisableDepthTest | DisableDepthWrite,
-	DisableCulling = 4
+	DisableCulling = 4,
+	Additive = 8,
+	InvertDestination = 16
 }
 
 public partial class Material : Asset
@@ -214,7 +216,7 @@ public partial class Material : Asset
 		//
 		var pipelineDescription = new GraphicsPipelineDescription()
 		{
-			BlendState = BlendStateDescription.SingleAlphaBlend,
+			BlendState = BlendState( flags ),
 
 			DepthStencilState = new DepthStencilStateDescription(
 				!flags.HasFlag( MaterialFlags.DisableDepthTest ),
@@ -241,6 +243,22 @@ public partial class Material : Asset
 		var bufferDescription = new BufferDescription( 16 * 128, BufferUsage.UniformBuffer | BufferUsage.Dynamic );
 		ScratchBuffer = Device.ResourceFactory.CreateBuffer( bufferDescription );
 	}
+
+	internal static BlendStateDescription BlendState( MaterialFlags flags ) => (flags & (MaterialFlags.Additive | MaterialFlags.InvertDestination)) != 0
+		? new BlendStateDescription
+		{
+			BlendFactor = RgbaFloat.Black,
+			AttachmentStates = [new BlendAttachmentDescription
+			{
+				BlendEnabled = true,
+				SourceColorFactor = flags.HasFlag( MaterialFlags.InvertDestination ) ? BlendFactor.InverseDestinationColor : BlendFactor.SourceAlpha,
+				DestinationColorFactor = flags.HasFlag( MaterialFlags.InvertDestination ) ? BlendFactor.Zero : BlendFactor.One,
+				ColorFunction = BlendFunction.Add,
+				SourceAlphaFactor = flags.HasFlag( MaterialFlags.InvertDestination ) ? BlendFactor.InverseDestinationAlpha : BlendFactor.SourceAlpha,
+				DestinationAlphaFactor = flags.HasFlag( MaterialFlags.InvertDestination ) ? BlendFactor.Zero : BlendFactor.One,
+				AlphaFunction = BlendFunction.Add
+			}]
+		} : BlendStateDescription.SingleAlphaBlend;
 }
 
 public class Material<T> : Material

@@ -1,39 +1,57 @@
+using StbImageSharp;
+using N = System.Numerics;
+
 namespace OpenTPW;
 
-/// <summary>Selected-island sky and the lobby's distance-controlled rain / lightning.</summary>
+/// <summary>View-relative retail rain, seeded lightning strokes and the one-frame flash.</summary>
 public sealed class LobbyWeather : ModelEntity
 {
 	private readonly Sky sky;
 	private readonly Func<LobbyIslandConfig> currentIsland;
 	private readonly LobbyConfig? config;
-	private readonly Vertex[] vertices = new Vertex[(400 + 24) * 6];
-	private readonly Vector3[] drops = new Vector3[400];
-	private readonly Vector3[] bolt = new Vector3[25];
-	private uint random = 0x517CC1B7;
-	private float flash;
-	private int previousIsland = -1;
+	private readonly Vector3[]? rainyCenters;
+	private readonly LobbyQuality quality;
+	private readonly LobbyWeatherSimulation simulation;
+	private readonly LobbyRainSimulation rain = new();
+	private readonly LobbyLightningGeometry lightning = new();
+	private readonly Vertex[] rainVertices = new Vertex[400 * 6];
+	private readonly Vertex[] boltVertices = new Vertex[65532];
+	private readonly Model boltModel;
+	private readonly Texture white;
+	private readonly Material flashMaterial;
 	public int RainAmount { get; private set; }
 
 	public LobbyWeather( Sky sky, Func<LobbyIslandConfig> currentIsland, LobbyConfig? config = null )
+		: this( sky, currentIsland, config, new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) ) ) { }
+
+	internal LobbyWeather( Sky sky, Func<LobbyIslandConfig> currentIsland, LobbyConfig? config, LobbyRandom random )
 	{
 		this.sky = sky;
 		this.currentIsland = currentIsland;
 		this.config = config;
-		var material = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader", MaterialFlags.DisableDepthWrite );
-		material.Set( "Color", new Texture( [170, 200, 230, 180], 1, 1 ) );
-		Model = new Model( vertices, material );
-		for ( int i = 0; i < drops.Length; i++ ) drops[i] = new( Unit() * 180 - 90, Unit() * 180 - 90, Unit() * 130 - 35 );
-		ApplyEnvironment();
+		rainyCenters = config?.Islands.Where( island => island.Rainy ).Select( IslandPosition ).ToArray();
+		quality = LobbyQuality.Load();
+		simulation = new LobbyWeatherSimulation( random );
+		// The view overlay follows the world, before the later HUD screen pass.
+		Layer = RenderLayer.Ui;
+		Model = CreateModel( rainVertices, "raindrop.tga" );
+		boltModel = CreateModel( boltVertices, "lightning.tga" );
+		white = new Texture( [255, 255, 255, 255], 1, 1 );
+		flashMaterial = new Material( "content/shaders/ui.shader", MaterialFlags.DisableDepth | MaterialFlags.InvertDestination );
 	}
 
-	private uint Next()
+	private static Model CreateModel( Vertex[] vertices, string name )
 	{
-		uint value = unchecked(random * 0x19660D + 0x3C6EF35F);
-		return random = (value >> 13) | (value << 19);
+		var image = ReadTexture( name );
+		var material = new Material( "content/shaders/lobby-weather.shader", MaterialFlags.DisableDepth | MaterialFlags.DisableCulling | MaterialFlags.Additive );
+		material.Set( "Color", new Texture( image.Data, image.Width, image.Height ) );
+		return new Model( vertices, material );
 	}
-	private float Unit() => (Next() & 0x3FFFFFFF) * (1f / 1073741824f);
 
-	protected override void OnUpdate() => ApplyEnvironment();
+	internal static ImageResult ReadTexture( string name )
+	{
+		return RetailTexturePixels.DecodeTga( FileSystem.ReadAllBytes( "/generic/weather/" + name ) );
+	}
 
 	private Vector3 IslandPosition( LobbyIslandConfig island )
 	{
@@ -42,57 +60,117 @@ public sealed class LobbyWeather : ModelEntity
 		return Vector3.Zero;
 	}
 
-	private void ApplyEnvironment()
+	protected override void OnUpdate()
 	{
 		var island = currentIsland();
 		if ( island == null ) return;
-		if ( previousIsland != island.Id ) { flash = 0; previousIsland = island.Id; }
-		flash = Math.Max( 0, flash - RetailTime.FrameSeconds );
-		// FUN_005db430: mask the rotated LCG once per frame; 63 gives one chance in 64.
-		if ( island.Lightning > 0 && (Next() & (uint)island.Lightning) == 1 )
-		{
-			var center = IslandPosition( island );
-			var top = new Vector3( center.X + Unit() * 100 - 50, center.Y + Unit() * 100 - 50, 500 );
-			var bottom = new Vector3( top.X + Unit() * 20 - 10, top.Y + Unit() * 20 - 10, 0 );
-			for ( int i = 0; i < bolt.Length; i++ )
-			{
-				float t = i / (float)(bolt.Length - 1);
-				bolt[i] = top * (1 - t) + bottom * t;
-				if ( i > 0 && i < bolt.Length - 1 ) bolt[i] += new Vector3( Unit() * 8 - 4, Unit() * 8 - 4, 0 );
-			}
-			flash = 0.12f;
-		}
 		sky.SetIslandColour( island.SkyColour );
-		float strength = flash > 0 ? flash / 0.12f * 0.65f : 0;
-		sky.SetFlash( strength );
-
-		var rainy = config?.Islands.Where( x => x.Rainy ).ToArray() ?? (island.Rainy ? new[] { island } : Array.Empty<LobbyIslandConfig>());
-		double meanSquaredDistance = 0;
-		foreach ( var wetIsland in rainy )
-		{
-			var d = Camera.Position - IslandPosition( wetIsland );
-			meanSquaredDistance += d.X * d.X + d.Y * d.Y;
-		}
-		if ( rainy.Length > 0 ) meanSquaredDistance /= rainy.Length;
-		double amount = rainy.Length == 0 ? 0 : 1e17 / Math.Pow( Math.Max( 1, meanSquaredDistance ), 3 );
-		RainAmount = amount < 20 ? 0 : (int)Math.Min( 400, amount );
-		Array.Clear( vertices );
-		var right = Camera.Rotation.Right;
-		for ( int i = 0; i < RainAmount; i++ )
-		{
-			drops[i].Z -= RetailTime.FrameSeconds * 110;
-			if ( drops[i].Z < -35 ) drops[i].Z += 130;
-			var p = Camera.Position + drops[i];
-			Ribbon( i * 6, p, p + new Vector3( -0.3f, 0, 2.7f ), right * 0.04f );
-		}
-		if ( flash > 0 )
-			for ( int i = 0; i < bolt.Length - 1; i++ ) Ribbon( (400 + i) * 6, bolt[i], bolt[i + 1], right * 0.6f );
-		Model!.UpdateVertices( vertices );
+		simulation.Update( island.Lightning, IslandPosition( island ), RetailTime.FrameSeconds, quality.WeatherEnabled );
+		var centers = rainyCenters ?? (island.Rainy ? new[] { IslandPosition( island ) } : Array.Empty<Vector3>());
+		RainAmount = quality.WeatherEnabled ? CalculateRainAmount( Camera.Position, centers ) : 0;
+		if ( RainAmount > 0 ) rain.Advance( RetailTime.FrameSeconds );
 	}
 
-	private void Ribbon( int offset, Vector3 a, Vector3 b, Vector3 side )
+	private static N.Vector4 Project( Vector3 point )
 	{
-		vertices[offset] = new( a - side ); vertices[offset + 1] = new( b - side ); vertices[offset + 2] = new( b + side );
-		vertices[offset + 3] = new( b + side ); vertices[offset + 4] = new( a + side ); vertices[offset + 5] = new( a - side );
+		var clip = N.Vector4.Transform( new N.Vector4( point.GetSystemVector3(), 1 ), Camera.ViewMatrix * Camera.ProjMatrix );
+		return new( clip.X, clip.Y, 0.001f, clip.W );
+	}
+
+	private static Vertex V( N.Vector4 p, float u, float v, float brightness, uint alpha ) =>
+		new( new Vector3( p.X, p.Y, p.Z ), new Vector3( brightness ), new Vector2( u, v ) )
+		{ TexIndex = BitConverter.SingleToInt32Bits( p.W ), MatFlags = alpha };
+
+	private static void Quad( Vertex[] vertices, ref int offset, N.Vector4 a0, N.Vector4 a1, N.Vector4 b0, N.Vector4 b1, float brightness, uint startAlpha, uint endAlpha, bool reverseV = false )
+	{
+		if ( offset + 6 > vertices.Length ) throw new InvalidOperationException( "Lobby weather vertex capacity exceeded." );
+		float startV = reverseV ? 1 : 0, endV = 1 - startV;
+		vertices[offset++] = V( a0, 0, startV, brightness, startAlpha );
+		vertices[offset++] = V( b0, 0, endV, brightness, endAlpha );
+		vertices[offset++] = V( b1, 1, endV, brightness, endAlpha );
+		vertices[offset++] = V( b1, 1, endV, brightness, endAlpha );
+		vertices[offset++] = V( a1, 1, startV, brightness, startAlpha );
+		vertices[offset++] = V( a0, 0, startV, brightness, startAlpha );
+	}
+
+	internal static void RainQuad( Vertex[] vertices, ref int offset, N.Vector4 tail, N.Vector4 head, float brightness )
+	{
+		var side = new N.Vector4( (head.Y - tail.Y) * 0.1f, -(head.X - tail.X) * 0.1f, 0, 0 );
+		// 0x57b8ed..0x57b9fe: upper tail Vmax/alpha128, falling head Vmin/alpha255.
+		Quad( vertices, ref offset, tail - side, tail + side, head - side, head + side,
+			brightness, 128, 255, reverseV: true );
+	}
+
+	protected override void OnRender()
+	{
+		if ( simulation.ConsumeFlash() )
+		{
+			var material = flashMaterial;
+			material.Set( "Color", white );
+			using ( new Graphics.Scope( new Point2( 1, 1 ) ) ) Graphics.Quad( new Rectangle( 0, 0, 1, 1 ), material );
+		}
+		Array.Clear( boltVertices );
+		int boltOffset = 0;
+		if ( quality.WeatherEnabled )
+		foreach ( var bolt in simulation.Bolts.AsEnumerable().Reverse() )
+		{
+			float phase = (bolt.Milliseconds % 500) * 0.002f;
+			int baseColor = phase >= 0.9f ? 192 - (int)((1 - phase) * 10 * -64) : 255 - (int)((0.9f - phase) * 1.11f * 64);
+			float brightness = ((baseColor + (RetailRandom.Next() & 63)) & 255) / 255f;
+			foreach ( var stroke in lightning.Generate( bolt.Top, bolt.Bottom, bolt.Seed ) )
+			{
+				var points = stroke.Points.Select( Project ).ToArray();
+				var directions = new N.Vector2[points.Length - 1];
+				float width = 1.3f / (stroke.Depth + 1);
+				for ( int i = 0; i < directions.Length; i++ )
+				{
+					var d = new N.Vector2( points[i + 1].X - points[i].X, points[i + 1].Y - points[i].Y );
+					directions[i] = d.LengthSquared() == 0 ? N.Vector2.Zero : N.Vector2.Normalize( d ) * width;
+				}
+				N.Vector4 Side( int i )
+				{
+					var tangent = i == 0 ? directions[0] : i == points.Length - 1 ? directions[^1] : directions[i - 1] + directions[i];
+					if ( tangent.LengthSquared() != 0 ) tangent = N.Vector2.Normalize( tangent ) * width;
+					return new( tangent.Y, -tangent.X, 0, 0 );
+				}
+				for ( int i = 0; i < points.Length - 1; i++ )
+					Quad( boltVertices, ref boltOffset, points[i] - Side( i ), points[i] + Side( i ), points[i + 1] - Side( i + 1 ), points[i + 1] + Side( i + 1 ), brightness, 255, 255 );
+			}
+		}
+		boltModel.UpdateVertices( boltVertices );
+		boltModel.Draw();
+		Array.Clear( rainVertices );
+		int rainOffset = 0;
+		for ( int i = 0; i < RainAmount; i++ )
+		{
+			var local = rain.Point( i, Camera.Position );
+			var a = Project( Camera.Position + local );
+			if ( a.W <= 0 ) continue;
+			var b = Project( Camera.Position + local - new Vector3( 0, 0, 0.1f ) );
+			float brightness = Math.Max( 0, (int)((6 - a.W) * 12) ) * 3 / 255f;
+			RainQuad( rainVertices, ref rainOffset, a, b, brightness );
+		}
+		Model!.UpdateVertices( rainVertices );
+		Model.Draw();
+	}
+
+	internal static int CalculateRainAmount( float meanSquaredDistance, int rainyIslands )
+	{
+		if ( rainyIslands == 0 ) return 0;
+		// 0x5dbe7f..0x5dbe90 squares the mean twice before the reverse divide.
+		float squared = meanSquaredDistance * meanSquaredDistance;
+		float amount = 1e17f / (squared * squared);
+		return amount < 20 ? 0 : (int)Math.Min( 400, amount );
+	}
+
+	internal static int CalculateRainAmount( Vector3 camera, IReadOnlyList<Vector3> rainyCenters )
+	{
+		float sum = 0;
+		foreach ( var center in rainyCenters )
+		{
+			float x = camera.X - center.X, y = camera.Y - center.Y;
+			sum += x * x + y * y;
+		}
+		return CalculateRainAmount( rainyCenters.Count == 0 ? 0 : sum / rainyCenters.Count, rainyCenters.Count );
 	}
 }

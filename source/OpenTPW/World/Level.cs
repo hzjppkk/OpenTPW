@@ -30,9 +30,9 @@ public class Level
 		var sky = new Sky();
 		EnvironmentSky = sky;
 		Lobby = LobbyConfig.Load();
-		LobbyCameraMode.Configure( Lobby );
-		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby );
 		var lobbyRandom = new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
+		LobbyCameraMode.Configure( Lobby );
+		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby, lobbyRandom );
 		foreach ( var island in Lobby.Islands )
 		{
 			var center = Lobby.CameraPositions[island.Id];
@@ -54,6 +54,8 @@ public class Level
 
 	public void Update()
 	{
+		// 0x5db430 updates the camera before calculating distance-controlled weather.
+		Camera.Update();
 		// Flocks can add model entities while replenishing their actor list.
 		foreach ( var entity in Entity.All.ToArray() ) entity.Update();
 		if ( Lobby != null ) LobbyNavigation.Draw( Lobby );
@@ -61,8 +63,6 @@ public class Level
 
 	public void Render()
 	{
-		Camera.Update();
-
 		// Retail registers screen-space UI models separately (TP.exe 0x474eb0 ->
 		// 0x45a960, list mask 0x20; screen transform at 0x474f10).
 		// Keep the OpenTPW HUD out of world creation order as well.
