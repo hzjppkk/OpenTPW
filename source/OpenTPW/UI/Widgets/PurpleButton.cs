@@ -1,4 +1,4 @@
-﻿using OpenTPW.UI;
+using OpenTPW.UI;
 using Veldrid;
 
 namespace OpenTPW;
@@ -9,9 +9,9 @@ namespace OpenTPW;
 /// </summary>
 internal class PurpleButton : Panel
 {
-	// The original lays the lobby out for 640x480; this HUD is 1280x720. Scale to fit the
-	// height and keep the buttons against the right edge, where the original puts them.
-	private const float Scale = 720f / 480f;
+	// TP.exe 0x474f10 maps each axis independently from its 2048x1536 control space.
+	// Expressed in 640x480 pixels, the current 1280x720 HUD uses scales 2 and 1.5.
+	private static readonly Vector2 Scale = new( 2, 1.5f );
 
 	// Label style, set for every lobby label by the lobby setup (TP.exe 0x4a4010):
 	// font slot 5 (0x483d20), which is TITLEMED.bf4 at 640x480 (the font loader 0x419390 fills
@@ -26,17 +26,11 @@ internal class PurpleButton : Panel
 	private const int ShadowOffset = 2;
 	private const byte ShadowLevel = 0x80;
 
-	// Where the bar's visible top-left edge sits in the original, inside the button's rectangle
-	// (measured on the original lobby at 640x480: rectangle 276.25,14.38; bar edge 280,16)
-	private static readonly Vector2 BarInset = new( 3.75f, 1.6f );
+	private readonly List<Model> bars = new();
+	private static LobbyButtonGeometry? geometry;
+	private static Shader? barShader;
+	private static readonly Dictionary<string, Texture> barTextures = new( StringComparer.OrdinalIgnoreCase );
 
-	// Offset from the bar's visible top-left edge to the position the bar quads below are drawn
-	// from (measured on this HUD). The original draws the bar as a model (ui.wad b_login.MD2);
-	// these quads only approximate it.
-	private static readonly Vector2 BarOrigin = new( 546, 30 );
-
-	private Texture ButtonText1;
-	private Texture ButtonText2;
 	private Texture Label;
 	private Rectangle LabelRect;
 
@@ -48,8 +42,7 @@ internal class PurpleButton : Panel
 	/// <param name="textBox">The rectangle the label is centred in, 640x480 space</param>
 	public PurpleButton( string text, Rectangle frame, Rectangle textBox )
 	{
-		ButtonText1 = new Texture( "ui/textures/button_text1.wct", TextureFlags.PointFilter );
-		ButtonText2 = new Texture( "ui/textures/button_text2.wct", TextureFlags.PointFilter );
+		CreateBar( frame );
 
 		Text = Localization.Parse( text );
 		Log.Info( $"Parsed '{text}' as '{Text}'" );
@@ -65,7 +58,7 @@ internal class PurpleButton : Panel
 		var labelSize = new Vector2( label.Width, label.Height ) * Scale;
 		LabelRect = new Rectangle( labelTopLeft.X, labelTopLeft.Y - labelSize.Y, labelSize.X, labelSize.Y );
 
-		position = ToHud( new Vector2( frame.X, frame.Y ) + BarInset ) + BarOrigin;
+
 	}
 
 	/// <summary>
@@ -73,7 +66,39 @@ internal class PurpleButton : Panel
 	/// </summary>
 	private static Vector2 ToHud( Vector2 point )
 	{
-		return new Vector2( 1280 - (640 - point.X) * Scale, 720 - point.Y * Scale );
+		return new Vector2( point.X * Scale.X, 720 - point.Y * Scale.Y );
+	}
+
+	private void CreateBar( Rectangle frame )
+	{
+		geometry ??= new LobbyButtonGeometry( FileSystem.ReadAllBytes( AnimationFiles.ResolveModel( "ui/b_login.md2" ) ) );
+		barShader ??= new Shader( "content/shaders/ui.shader" );
+		foreach ( var mesh in geometry.Model.Meshes )
+		{
+			var vertices = new Vertex[mesh.Vertices.Length];
+			for ( int i = 0; i < vertices.Length; i++ )
+			{
+				var point = System.Numerics.Vector3.Transform( mesh.Vertices[i].Position.GetSystemVector3(), mesh.WorldTransform );
+				vertices[i] = new Vertex( geometry.Project( point, frame ), mesh.TexCoords[i] );
+			}
+			for ( int m = 0; m < mesh.Materials.Length; m++ )
+			{
+				var indices = new List<uint>();
+				for ( int i = 0; i < mesh.Indices.Length; i += 3 )
+				{
+					if ( mesh.Vertices[mesh.Indices[i]].TextureIndex != m ) continue;
+					indices.AddRange( mesh.Indices.Skip( i ).Take( 3 ) );
+				}
+				if ( indices.Count == 0 ) continue;
+				string name = mesh.Materials[m].Name?.TrimEnd( '\0' )
+					?? throw new InvalidDataException( "Lobby button material has no texture" );
+				if ( !barTextures.TryGetValue( name, out var texture ) )
+					barTextures[name] = texture = new Texture( AnimationFiles.ResolveFile( $"ui/textures/{name}.wct", "Lobby button texture" ), TextureFlags.PointFilter );
+				var material = new Material<ObjectUniformBuffer>( barShader, MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
+				material.Set( "Color", texture );
+				bars.Add( new Model( vertices, indices.ToArray(), material ) );
+			}
+		}
 	}
 
 	/// <summary>
@@ -118,37 +143,8 @@ internal class PurpleButton : Panel
 	protected override void OnRender()
 	{
 		var material = Material.UI;
-		var size = new Vector2( 200, 100 );
-		var rect = new Rectangle( position, size );
+		foreach ( var bar in bars ) bar.Draw();
 
-		var uvs = new Rectangle( 0f, 0f, 1.0f, 0.5f );
-		rect.Y -= 130;
-		rect.X -= 740;
-
-		//
-		// End
-		//
-		material.Set( "Color", ButtonText1 );
-		rect.X += 190;
-		Graphics.Quad( rect, uvs.Shift( new Vector2( 0, 0.50f ) ), material );
-
-		//
-		// Middle
-		//
-		material.Set( "Color", ButtonText1 );
-		rect.X += 190;
-		Graphics.Quad( rect.Shift( new Vector2( 0, 28 ) ), uvs.Shift( new Vector2( 0, 0f ) ), material );
-
-		//
-		// Start
-		//
-		rect.X += 200;
-		material.Set( "Color", ButtonText2 );
-		Graphics.Quad( rect, uvs.Shift( new Vector2( 0f, 0.50f ) ), material );
-
-		//
-		// Label
-		//
 		material.Set( "Color", Label );
 		Graphics.Quad( LabelRect, new Rectangle( 0, 0, 1, 1 ), material );
 	}
