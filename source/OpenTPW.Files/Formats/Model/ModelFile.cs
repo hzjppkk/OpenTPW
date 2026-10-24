@@ -89,6 +89,8 @@ public partial class ModelFile : BaseFormat
 	{
 		public string Name { get; set; }
 		public uint Flags { get; set; }
+		/// <summary>Authored node identifier, used when the animation instance requests ID binding.</summary>
+		public ushort Id { get; set; }
 
 		/// <summary>
 		/// Index into <see cref="Nodes"/> of the parent node, or -1 for a root.
@@ -247,7 +249,7 @@ public partial class ModelFile : BaseFormat
 
 				Matrix4x4 transformMatrix = ReadMatrix( reader );
 
-				uint texIndex = reader.ReadUInt32();
+				uint nodeId = reader.ReadUInt32();
 				uint nOff = reader.ReadUInt32();
 				ushort vertexCount = reader.ReadUInt16();
 				ushort materialCount = reader.ReadUInt16();
@@ -322,6 +324,7 @@ public partial class ModelFile : BaseFormat
 				{
 					Name = name,
 					Flags = nodeFlags,
+					Id = (ushort)nodeId,
 					ParentIndex = parentIndex,
 					LocalTransform = transformMatrix,
 					Mesh = mesh
@@ -339,13 +342,14 @@ public partial class ModelFile : BaseFormat
 
 				Matrix4x4 transformMatrix = ReadMatrix( reader );
 
-				_ = reader.ReadUInt32(); // Node index
+				uint nodeId = reader.ReadUInt32();
 				uint nameOffset = reader.ReadUInt32();
 
 				Nodes.Add( new Node
 				{
 					Name = ReadString( reader, nameOffset ),
 					Flags = nodeFlags,
+					Id = (ushort)nodeId,
 					ParentIndex = parentIndex,
 					LocalTransform = transformMatrix
 				} );

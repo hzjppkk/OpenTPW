@@ -17,6 +17,9 @@ public class ModelAnimation : BaseFormat
 	/// </summary>
 	public const float FramesPerSecond = 30f;
 
+	/// <summary>Segment hiding is an instance binding choice (TP.exe 0x471030), separate from visibility tracks.</summary>
+	public enum SegmentHiding { Disabled, NodeIndex, NodeId }
+
 	[Flags]
 	public enum TrackFlags : uint
 	{
@@ -134,6 +137,8 @@ public class ModelAnimation : BaseFormat
 	public uint StartFrame { get; private set; }
 	public uint EndFrame { get; private set; }
 	public List<Track> Tracks { get; private set; }
+	/// <summary>Nodes hidden for this segment, independently of per-frame visibility tracks (TP.exe 0x471030).</summary>
+	public ushort[] HiddenNodes { get; private set; } = [];
 
 	public float Length => EndFrame - StartFrame;
 
@@ -168,6 +173,16 @@ public class ModelAnimation : BaseFormat
 		ushort trackCount = reader.ReadUInt16();
 		reader.BaseStream.Seek( block + 0x2C, SeekOrigin.Begin );
 		uint trackTable = reader.ReadUInt32();
+		reader.BaseStream.Seek( block + 0x1A, SeekOrigin.Begin );
+		ushort hiddenCount = reader.ReadUInt16();
+		reader.BaseStream.Seek( block + 0x38, SeekOrigin.Begin );
+		uint hiddenTable = reader.ReadUInt32();
+		if ( hiddenCount != 0 && hiddenTable == 0 ) throw new InvalidDataException( "Animation hidden-node table is missing" );
+		if ( hiddenCount != 0 && (hiddenTable > stream.Length || hiddenCount * 2L > stream.Length - hiddenTable) )
+			throw new InvalidDataException( "Animation hidden-node table is truncated" );
+		reader.BaseStream.Seek( hiddenTable, SeekOrigin.Begin );
+		HiddenNodes = new ushort[hiddenCount];
+		for ( int i = 0; i < hiddenCount; i++ ) HiddenNodes[i] = reader.ReadUInt16();
 
 		for ( int i = 0; i < trackCount; i++ )
 			Tracks.Add( ReadTrack( reader, trackTable + (uint)(i * TrackSize) ) );
@@ -392,9 +407,18 @@ public class ModelAnimation : BaseFormat
 	/// Poses <paramref name="model"/> at <paramref name="frame"/>. Tracks apply visibility, vertices,
 	/// rotation, scale and then translation, as the game does.
 	/// </summary>
-	public ModelPose Evaluate( ModelFile model, float frame )
+	public ModelPose Evaluate( ModelFile model, float frame, SegmentHiding segmentHiding = SegmentHiding.Disabled )
 	{
 		var pose = new ModelPose( model );
+		if ( segmentHiding != SegmentHiding.Disabled )
+		foreach ( ushort reference in HiddenNodes )
+		{
+			int node = segmentHiding == SegmentHiding.NodeId ? model.Nodes.FindIndex( candidate => candidate.Id == reference ) : reference;
+			// ID binding searches the instantiated model and leaves unmatched IDs alone.
+			if ( node < 0 ) continue;
+			if ( node >= model.Nodes.Count ) throw new InvalidDataException( $"Animation hides nonexistent node {reference}" );
+			if ( (model.Nodes[node].Flags & 0x80000000) == 0 ) pose.Hidden[node] = true;
+		}
 		var raw = new NVector3[model.Nodes.Count][];
 
 		foreach ( var track in Tracks )
