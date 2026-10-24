@@ -13,6 +13,7 @@ public class Level
 	public AudioSystem? Audio { get; }
 	public LobbyAudio? LobbySound { get; }
 	public LobbyAdvisor? Advisor { get; private set; }
+	internal LobbyPlayerPanel? PlayerMenu { get; set; }
 
 	public SettingsFile Global { get; private init; }
 

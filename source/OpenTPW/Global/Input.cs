@@ -7,6 +7,10 @@ public static partial class Input
 {
 	public static MouseInfo Mouse { get; internal set; } = new();
 	public static KeyboardInfo Keyboard { get; internal set; } = new();
+	public static string Text { get; private set; } = "";
+	public static bool LeftPressed { get; private set; }
+	private static HashSet<Key> pressedKeys = new();
+	public static bool Pressed( Key key ) => pressedKeys.Contains( key );
 
 	public static float Forward { get; set; }
 	public static float Right { get; set; }
@@ -97,7 +101,11 @@ public static partial class Input
 			Wheel = inputSnapshot.WheelDelta
 		};
 
+		// A press and release may both arrive between frames; retain the event even when polling is up.
+		LeftPressed = inputSnapshot.MouseEvents.Any( mouse => mouse.MouseButton == MouseButton.Left && mouse.Down ) || mouseInfo.Left && !Mouse.Left;
 		Mouse = mouseInfo;
+		Text = new string( inputSnapshot.KeyCharPresses.ToArray() );
+		pressedKeys = inputSnapshot.KeyEvents.Where( key => key.Down ).Select( key => key.Key ).ToHashSet();
 
 		Right = 0;
 		Forward = 0;

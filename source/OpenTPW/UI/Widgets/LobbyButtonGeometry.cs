@@ -8,17 +8,43 @@ public sealed class LobbyButtonGeometry
 	public ModelFile Model { get; }
 	public System.Numerics.Vector3 Minimum { get; }
 	public System.Numerics.Vector3 Maximum { get; }
+	public int RootMeshIndex { get; }
+	public int[] StateRoots { get; }
+	public int[] VisibleMeshes { get; }
 
-	public LobbyButtonGeometry( byte[] data )
+	public LobbyButtonGeometry( byte[] data, int state = 0 )
 	{
 		Model = new ModelFile( new MemoryStream( data ) );
 		// TP.exe 0x4751d0 transforms the root's two stored bounds through its ancestors,
 		// then 0x474f10 fits their X/Y extent to the control rectangle and flattens Z.
 		int rootOffset = checked((int)BitConverter.ToUInt32( data, 0x78 ));
 		int meshOffset = checked((int)BitConverter.ToUInt32( data, 0x70 ));
+		var roots = new List<int>();
+		var offsets = new HashSet<int>();
+		for ( int offset = rootOffset; offset != 0; offset = checked((int)BitConverter.ToUInt32( data, offset + 12 )) )
+		{
+			if ( offset < meshOffset || offset + 160 > data.Length || (offset - meshOffset) % 160 != 0 ||
+				(offset - meshOffset) / 160 >= Model.Meshes.Count || !offsets.Add( offset ) ) throw new InvalidDataException( "Invalid UI state root chain" );
+			roots.Add( (offset - meshOffset) / 160 );
+		}
+		if ( state < 0 || state >= roots.Count ) throw new ArgumentOutOfRangeException( nameof(state) );
+		StateRoots = roots.ToArray();
+		rootOffset = meshOffset + roots[state] * 160;
 		int meshIndex = (rootOffset - meshOffset) / 160;
 		if ( rootOffset < meshOffset || (rootOffset - meshOffset) % 160 != 0 || meshIndex >= Model.Meshes.Count )
 			throw new InvalidDataException( "Lobby button root is not a mesh" );
+		RootMeshIndex = meshIndex;
+		bool Belongs( int index )
+		{
+			for ( int depth = 0; index >= 0 && depth < Model.Nodes.Count; depth++ )
+			{
+				if ( index == meshIndex ) return true;
+				if ( roots.Contains( index ) ) return false;
+				index = Model.Nodes[index].ParentIndex;
+			}
+			return false;
+		}
+		VisibleMeshes = Enumerable.Range( 0, Model.Meshes.Count ).Where( Belongs ).ToArray();
 		System.Numerics.Vector3 ReadPoint( int offset ) => new( BitConverter.ToSingle( data, offset ),
 			BitConverter.ToSingle( data, offset + 4 ), BitConverter.ToSingle( data, offset + 8 ) );
 		var world = Model.Meshes[meshIndex].WorldTransform;
