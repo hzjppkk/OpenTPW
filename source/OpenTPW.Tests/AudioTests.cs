@@ -9,6 +9,75 @@ namespace OpenTPW.Tests;
 public class AudioTests
 {
 	[TestMethod]
+	public void OutputBudgetRanksVoicesWithoutRestartingVirtualInstances()
+	{
+		var mixer = new SoundMixer( 1000, 2 ) { VoiceLimit = 1 };
+		long low = mixer.Play( new[] { 0.1f, 0.1f, 0.2f, 0.2f, 0.3f, 0.3f }, priority: 1 );
+		long high = mixer.Play( new[] { 0.6f, 0.6f }, delayMilliseconds: 1, priority: 2 );
+		var output = new float[6];
+		mixer.Read( output, 0, output.Length );
+		CollectionAssert.AreEqual( new[] { 0.1f, 0.1f, 0.6f, 0.6f, 0.3f, 0.3f }, output );
+		Assert.IsFalse( mixer.IsPlaying( low ) );
+		Assert.IsFalse( mixer.IsPlaying( high ) );
+		mixer.Play( new[] { 0.1f, 0.1f }, loop: true, priority: 7 );
+		mixer.Play( new[] { 0.4f, 0.4f }, loop: true, priority: 7 );
+		mixer.Read( output, 0, 2 );
+		Assert.AreEqual( 0.4f, output[0], "Native active list visits the newest equal-priority instance first" );
+		Assert.AreEqual( 2, mixer.ActiveVoices, "Output preemption must retain the logical instance" );
+		mixer.VoiceLimit = 2;
+		mixer.Read( output, 0, 2 );
+		Assert.AreEqual( 0.5f, output[0], 0.00001f );
+	}
+
+	[TestMethod]
+	public void SoundQualityUsesNativeIntervalsAndSchedulerCeiling()
+	{
+		GameData.Require();
+		var settings = new SettingsFile( "sound.sam" );
+		foreach ( var (quality, limit) in new[] { (0, 5), (25, 8), (50, 12), (70, 12), (71, 19), (100, 30) } )
+			Assert.AreEqual( limit, SoundChannelPolicy.Limit( settings, quality ), $"Quality {quality}" );
+		Assert.AreEqual( 12, SoundChannelPolicy.Limit( settings, 100, 12 ) );
+		Assert.AreEqual( 30, SoundChannelPolicy.Limit( settings, 100, 64 ) );
+		Assert.ThrowsException<ArgumentOutOfRangeException>( () => SoundChannelPolicy.Limit( settings, 101 ) );
+	}
+
+	[TestMethod]
+	public void ProfileVolumeChangesUpdateAnExistingLoopWithoutRestartingIt()
+	{
+		GameData.Require();
+		using var audio = new AudioSystem( 123, false );
+		long handle = audio.Play( "levels/jungle/Sound", "cat_locallobbysfx", 2 );
+		var output = new float[8820];
+		audio.Mixer.Read( output, 0, output.Length );
+		Assert.IsTrue( output.Any( value => value != 0 ) );
+		double before = audio.Mixer.PositionSeconds( handle );
+		byte[] preferences = PlayerProfileFile.DefaultPreferences( new SettingsFile( "sound.sam" ) );
+		preferences[0] = 0;
+		audio.ConfigurePreferences( preferences );
+		audio.Mixer.Read( output, 0, output.Length );
+		Assert.IsTrue( output.All( value => value == 0 ) );
+		Assert.IsTrue( audio.Mixer.PositionSeconds( handle ) > before );
+		Assert.IsTrue( audio.IsPlaying( handle ) );
+		preferences[0] = 1;
+		audio.ConfigurePreferences( preferences );
+		audio.Mixer.Read( output, 0, output.Length );
+		Assert.IsTrue( output.Any( value => value != 0 ) );
+	}
+
+	[TestMethod]
+	public void ContinuationAvoidsNumericSampleIndexAcrossDefinitionsAndKeepsThresholdGaps()
+	{
+		var samples = new[] { new SoundCategoryMap.Sample( 10, 100, 10, 1, 0 ), new SoundCategoryMap.Sample( 20, 200, 10, 1, 0 ), new SoundCategoryMap.Sample( 30, 300, 10, 1, 0 ) };
+		var definition = new SoundCategoryMap.Definition( 1, 100, 100, 0, 0, samples, Array.Empty<SoundCategoryMap.Relation>(), new byte[42] );
+		Assert.AreEqual( 20u, SoundSelection.Sample( definition, 100, 0, true )!.Id );
+		Assert.AreEqual( 10u, SoundSelection.Sample( definition, 250, 2, true )!.Id );
+		Assert.AreEqual( 10u, SoundSelection.Sample( definition, 100, 0, false )!.Id );
+		Assert.IsNull( SoundSelection.Sample( definition, 301, 2, true ) );
+		var pair = definition with { Samples = samples[..2] };
+		Assert.AreEqual( 10u, SoundSelection.Sample( pair, 100, 0, true )!.Id );
+	}
+
+	[TestMethod]
 	public void ReusedNAudioByteBufferDoesNotReplayOrAccumulatePreviousSamples()
 	{
 		var mixer = new SoundMixer();

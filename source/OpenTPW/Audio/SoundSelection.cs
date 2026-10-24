@@ -24,15 +24,18 @@ public sealed class SoundSelection
 		}
 		return sound.Definitions[0];
 	}
-	public static SoundCategoryMap.Sample? Sample( SoundCategoryMap.Definition definition, uint draw )
+	public static SoundCategoryMap.Sample? Sample( SoundCategoryMap.Definition definition, uint draw, int previousIndex = -1, bool avoidRepeat = false )
 	{
 		if ( definition.Samples.Count == 1 ) return definition.Samples[0];
-		return definition.Samples.FirstOrDefault( sample => sample.Threshold >= draw );
+		for ( int index = 0; index < definition.Samples.Count; ++index )
+			if ( definition.Samples[index].Threshold >= draw )
+				return definition.Samples[avoidRepeat && definition.Samples.Count > 2 && index == previousIndex ? (index + 1) % definition.Samples.Count : index];
+		return null;
 	}
 	public SoundCategoryMap.Definition? ChooseDefinition( SoundCategoryMap.Sound sound ) =>
 		Definition( sound, sound.Definitions.Count > 1 ? Next() >> 16 : 0 );
-	public SoundCategoryMap.Sample? ChooseSample( SoundCategoryMap.Definition definition ) =>
-		Sample( definition, definition.Samples.Count > 1 ? Next() >> 16 : 0 );
+	public SoundCategoryMap.Sample? ChooseSample( SoundCategoryMap.Definition definition, int previousIndex = -1, bool avoidRepeat = false ) =>
+		Sample( definition, definition.Samples.Count > 1 ? Next() >> 16 : 0, previousIndex, avoidRepeat );
 	public int Range( int first, int second )
 	{
 		int min = Math.Min( first, second ), max = Math.Max( first, second );

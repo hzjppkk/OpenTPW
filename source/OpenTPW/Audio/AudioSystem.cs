@@ -9,8 +9,11 @@ public sealed class AudioSystem : IDisposable
 	public SoundAssets Assets { get; } = new();
 	private readonly SoundSelection random;
 	private sealed record Repeating( string Directory, string Category, SoundCategoryMap Map, SoundCategoryMap.Sound Sound,
-		SoundCategoryMap.Definition Definition, SoundCategoryMap.Sample Sample, long Voice );
+		SoundCategoryMap.Definition Definition, int SampleIndex, long Voice );
 	private readonly Dictionary<long, Repeating> repeating = new();
+	private sealed record ChannelGain( string Category, float Gain );
+	private readonly Dictionary<long, ChannelGain> gains = new();
+	private readonly SettingsFile settings = new( "sound.sam" );
 	private readonly WaveOutEvent? output;
 	private bool disposed;
 	public bool Available { get; }
@@ -20,7 +23,9 @@ public sealed class AudioSystem : IDisposable
 	public AudioSystem( uint seed, bool openDevice = true )
 	{
 		random = new( seed );
-		ConfigurePreferences( PlayerProfileFile.DefaultPreferences( new SettingsFile( "sound.sam" ) ) );
+		ConfigurePreferences( PlayerProfileFile.DefaultPreferences( settings ) );
+		if ( !int.TryParse( settings["SoundInfo.DEFAULTQUALITY"], out int quality ) ) throw new InvalidDataException( "Invalid default sound quality" );
+		ConfigureQuality( quality );
 		if ( !openDevice ) { Available = true; return; }
 		try
 		{
@@ -51,20 +56,24 @@ public sealed class AudioSystem : IDisposable
 		// 0x6ba400 collapses a one-definition, one-sample repeat with no links/delay into a direct loop.
 		bool directLoop = (sound.Flags & 8) != 0 || ((sound.Flags & 6) == 6 && sound.Definitions.Count == 1 &&
 			definition.Samples.Count == 1 && definition.Relations.Count == 0 && definition.DelayMin == 0 && definition.DelayMax == 0);
-		long handle = Mixer.Play( Assets.Pcm( asset ), random.Range( definition.VolumeMin, definition.VolumeMax ) / 100f * ChannelVolume( category ),
-			directLoop, random.Range( definition.DelayMin, definition.DelayMax ) );
-		if ( !directLoop && (sound.Flags & 4) != 0 ) repeating.Add( handle, new( directory, category, map, sound, definition, sample, handle ) );
+		float gain = random.Range( definition.VolumeMin, definition.VolumeMax ) / 100f;
+		long handle = Mixer.Play( Assets.Pcm( asset ), gain * ChannelVolume( category ),
+			directLoop, random.Range( definition.DelayMin, definition.DelayMax ), unchecked((sound.Priority << 16) + 0xffff) );
+		gains.Add( handle, new( category, gain ) );
+		if ( !directLoop && (sound.Flags & 4) != 0 ) repeating.Add( handle, new( directory, category, map, sound, definition, definition.Samples.ToList().IndexOf( sample ), handle ) );
 		return handle;
 	}
 
 	public bool IsPlaying( long handle ) => repeating.ContainsKey( handle ) || Mixer.IsPlaying( handle );
 	public void Stop( long handle )
 	{
-		if ( repeating.Remove( handle, out var entry ) ) Mixer.Stop( entry.Voice );
-		else Mixer.Stop( handle );
+		long voice = repeating.Remove( handle, out var entry ) ? entry.Voice : handle;
+		Mixer.Stop( voice );
+		gains.Remove( voice );
 	}
 	public void Update()
 	{
+		foreach ( long handle in gains.Keys.ToArray() ) if ( !Mixer.IsPlaying( handle ) ) gains.Remove( handle );
 		foreach ( var (handle, entry) in repeating.ToArray() )
 		{
 			if ( Mixer.IsPlaying( entry.Voice ) ) continue;
@@ -85,18 +94,15 @@ public sealed class AudioSystem : IDisposable
 					break;
 				}
 			}
-			var sample = random.ChooseSample( definition );
+			// 0x6b6780 stores the last numeric index on the instance, even across definition changes.
+			var sample = random.ChooseSample( definition, entry.SampleIndex, true );
 			if ( sample == null || sample.Bank == 0 ) { repeating.Remove( handle ); continue; }
-			// 0x6b67fc: continuation requests avoid an immediate repeat only with more than two candidates.
-			if ( definition.Samples.Count > 2 && ReferenceEquals( sample, entry.Sample ) )
-			{
-				int index = definition.Samples.ToList().IndexOf( sample );
-				sample = definition.Samples[(index + 1) % definition.Samples.Count];
-			}
-			long voice = Mixer.Play( Assets.Pcm( Assets.Sample( entry.Directory, entry.Map, sample ) ),
-				random.Range( definition.VolumeMin, definition.VolumeMax ) / 100f * ChannelVolume( entry.Category ),
-				delayMilliseconds: random.Range( definition.DelayMin, definition.DelayMax ) );
-			repeating[handle] = entry with { Definition = definition, Sample = sample, Voice = voice };
+			float gain = random.Range( definition.VolumeMin, definition.VolumeMax ) / 100f;
+			long voice = Mixer.Play( Assets.Pcm( Assets.Sample( entry.Directory, entry.Map, sample ) ), gain * ChannelVolume( entry.Category ),
+				delayMilliseconds: random.Range( definition.DelayMin, definition.DelayMax ), priority: unchecked((entry.Sound.Priority << 16) + 0xffff) );
+			gains.Add( voice, new( entry.Category, gain ) );
+			repeating[handle] = entry with { Definition = definition,
+				SampleIndex = definition.Samples.Count > 1 ? definition.Samples.ToList().IndexOf( sample ) : entry.SampleIndex, Voice = voice };
 		}
 	}
 	public void ConfigurePreferences( byte[] preferences )
@@ -108,7 +114,10 @@ public sealed class AudioSystem : IDisposable
 			if ( volume > 100 ) throw new InvalidDataException( "Invalid audio channel volume" );
 			channelVolumes[i] = preferences[i * 8] == 0 ? 0 : volume / 100f;
 		}
+		// Category volume changes affect existing output too (0x4238c0 -> 0x518360/380/3a0).
+		foreach ( var (handle, gain) in gains ) Mixer.SetVolume( handle, gain.Gain * ChannelVolume( gain.Category ) );
 	}
+	public void ConfigureQuality( int quality ) => Mixer.VoiceLimit = SoundChannelPolicy.Limit( settings, quality );
 	private float ChannelVolume( string category ) => channelVolumes[category.EndsWith( "music", StringComparison.OrdinalIgnoreCase ) ? 1 :
 		category.Equals( "cat_speech", StringComparison.OrdinalIgnoreCase ) ? 2 : 0];
 
@@ -125,6 +134,7 @@ public sealed class AudioSystem : IDisposable
 		if ( disposed ) return;
 		disposed = true;
 		repeating.Clear();
+		gains.Clear();
 		output?.Stop();
 		output?.Dispose();
 		Mixer.StopAll();
