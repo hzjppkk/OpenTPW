@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Text;
 
 namespace OpenTPW;
@@ -327,7 +327,7 @@ public static class LobbySigns
 		}
 	}
 
-	private static class NativeFont
+	internal static class NativeFont
 	{
 		[StructLayout( LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode )]
 		private struct LogFont
@@ -368,6 +368,7 @@ public static class LobbySigns
 			if ( text.Length == 0 ) return result;
 			string fontPath = AnimationFiles.ResolveFile( $"fonts/{line.FontPath}", "Sign font" );
 			byte[] fontData = FileSystem.ReadAllBytes( fontPath );
+			var aliases = FontNames.Read( fontData );
 			IntPtr registration = AddFontMemResourceEx( fontData, (uint)fontData.Length, IntPtr.Zero, out uint count );
 			if ( registration == IntPtr.Zero || count == 0 ) throw new InvalidDataException( $"Could not load sign font {fontPath}" );
 			IntPtr dc = IntPtr.Zero, bitmap = IntPtr.Zero, oldBitmap = IntPtr.Zero, font = IntPtr.Zero, oldFont = IntPtr.Zero, analysis = IntPtr.Zero;
@@ -402,7 +403,10 @@ public static class LobbySigns
 					oldFont = SelectObject( dc, font );
 					var selectedFace = new StringBuilder( 64 );
 					GetTextFaceW( dc, selectedFace.Capacity, selectedFace );
-					if ( !selectedFace.ToString().Equals( line.Face, StringComparison.OrdinalIgnoreCase ) ) throw new InvalidDataException( $"Sign font {line.Face} resolved to {selectedFace}" );
+					if ( !FaceMatches( selectedFace.ToString(), line.Face, aliases ) )
+						throw new InvalidDataException( aliases.Count == 0
+							? $"Sign font {line.Face} resolved to {selectedFace}"
+							: $"Sign font {line.Face} resolved to {selectedFace}; {line.FontPath} declares {string.Join( ", ", aliases.SelectMany( names => names ).Distinct( StringComparer.OrdinalIgnoreCase ).OrderBy( name => name, StringComparer.Ordinal ) )}" );
 					Check( ScriptStringAnalyse( dc, text, text.Length, 0, -1, 0x80, 0, IntPtr.Zero, IntPtr.Zero, null, IntPtr.Zero, IntPtr.Zero, out analysis ) );
 					var advances = new int[text.Length];
 					Check( ScriptStringGetLogicalWidths( analysis, advances ) );
@@ -442,9 +446,93 @@ public static class LobbySigns
 			}
 		}
 
+		// GDI answers with the family name of the face it actually selected, which is often an
+		// English or localized alias of the requested name (新細明體 comes back as PMingLiU).
+		// Accept only aliases the shipped file itself declares, so a silent fallback to an
+		// unrelated font still fails; files without a readable name table keep the exact match.
+		internal static bool FaceMatches( string selected, string requested, IReadOnlyList<HashSet<string>> faces )
+		{
+			if ( faces.Count == 0 ) return selected.Equals( requested, StringComparison.OrdinalIgnoreCase );
+			return faces.Any( names => names.Contains( requested ) && names.Contains( selected ) );
+		}
+
 		private static void Check( int result )
 		{
 			if ( result < 0 ) Marshal.ThrowExceptionForHR( result );
+		}
+	}
+
+	/// <summary>Preserves each sfnt face's localized family names as a separate identity.</summary>
+	internal static class FontNames
+	{
+		public static IReadOnlyList<HashSet<string>> Read( byte[] data )
+		{
+			var faces = new List<HashSet<string>>();
+			if ( data.Length < 12 ) return faces;
+			if ( Encoding.ASCII.GetString( data, 0, 4 ) == "ttcf" )
+			{
+				uint count = U32( data, 8 );
+				Require( data, 12, (long)count * 4 );
+				for ( int i = 0; i < count; ++i ) ReadFace( data, U32( data, 12 + i * 4 ), faces );
+			}
+			else ReadFace( data, 0, faces );
+			return faces;
+		}
+
+		private static void Require( byte[] data, long offset, long length )
+		{
+			if ( offset < 0 || length < 0 || offset > data.LongLength || length > data.LongLength - offset )
+				throw new InvalidDataException( "Truncated font name data" );
+		}
+
+		private static int U16( byte[] data, int offset ) => data[offset] << 8 | data[offset + 1];
+		private static uint U32( byte[] data, int offset ) => (uint)data[offset] << 24 |
+			(uint)data[offset + 1] << 16 | (uint)data[offset + 2] << 8 | data[offset + 3];
+
+		private static void ReadFace( byte[] data, uint position, List<HashSet<string>> faces )
+		{
+			Require( data, position, 12 );
+			int face = (int)position, count = U16( data, face + 4 );
+			Require( data, (long)face + 12, count * 16L );
+			for ( int i = 0; i < count; ++i )
+			{
+				int record = face + 12 + i * 16;
+				if ( Encoding.ASCII.GetString( data, record, 4 ) != "name" ) continue;
+				uint offset = U32( data, record + 8 ), length = U32( data, record + 12 );
+				Require( data, offset, length );
+				if ( length < 6 ) throw new InvalidDataException( "Truncated font name table" );
+				var names = ReadNames( data, (int)offset, length );
+				if ( names.Count != 0 ) faces.Add( names );
+				return;
+			}
+		}
+
+		private static HashSet<string> ReadNames( byte[] data, int offset, uint length )
+		{
+			var names = new HashSet<string>( StringComparer.OrdinalIgnoreCase );
+			int count = U16( data, offset + 2 ), storage = U16( data, offset + 4 );
+			if ( 6L + count * 12L > length || storage < 6L + count * 12L || storage > length )
+				throw new InvalidDataException( "Invalid font name records" );
+			Encoding.RegisterProvider( CodePagesEncodingProvider.Instance );
+			for ( int i = 0; i < count; ++i )
+			{
+				int record = offset + 6 + i * 12;
+				int platform = U16( data, record ), encoding = U16( data, record + 2 ), id = U16( data, record + 6 );
+				if ( id != 1 && id != 4 && id != 16 ) continue;
+				int size = U16( data, record + 8 ), relative = U16( data, record + 10 );
+				if ( (long)storage + relative + size > length ) throw new InvalidDataException( "Truncated font name string" );
+				Encoding decoder;
+				if ( platform == 1 && encoding == 0 ) decoder = Encoding.GetEncoding( 10000 );
+				else if ( (platform == 0 && encoding <= 6) || (platform == 3 && (encoding == 0 || encoding == 1 || encoding == 10)) )
+				{
+					if ( (size & 1) != 0 ) throw new InvalidDataException( "Odd UTF-16 font name length" );
+					decoder = Encoding.BigEndianUnicode;
+				}
+				else continue;
+				string name = decoder.GetString( data, offset + storage + relative, size ).Trim( '\0', ' ' );
+				if ( name.Length != 0 ) names.Add( name );
+			}
+			return names;
 		}
 	}
 }

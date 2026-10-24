@@ -46,8 +46,23 @@ public class LobbySignsTests
 			}
 			var text = LobbySigns.LocalizedLines( name );
 			Assert.IsFalse( string.IsNullOrEmpty( text.First ) );
-			Assert.IsFalse( string.IsNullOrEmpty( text.Second ) );
+			// The shipped Traditional Chinese table stores zero-length second lines (entries
+			// 86/180/273/369), so only the first localized line is expected to carry text.
 		}
+	}
+
+	[TestMethod]
+	public void SubstitutedSignFontIsRejected()
+	{
+		GameData.Require();
+		// The first SGN line record starts after the 9-byte header and the two mode integers,
+		// so its 64-byte face field is at 17. Renaming the face makes GDI fall back to another
+		// installed font, which must not pass as the shipped sign font.
+		byte[] data = FileSystem.ReadAllBytes( "lobby/terrain/Jun_isle.sgn" );
+		System.Array.Clear( data, 17, 64 );
+		System.Text.Encoding.ASCII.GetBytes( "NoSuchSignFace" ).CopyTo( data, 17 );
+		var thrown = Assert.ThrowsException<InvalidDataException>( () => LobbySigns.Compose( data, "A", "" ) );
+		StringAssert.Contains( thrown.Message, "NoSuchSignFace" );
 	}
 
 	[TestMethod]
@@ -86,8 +101,67 @@ public class LobbySignsTests
 			}
 			Assert.IsTrue( changes > 100, name );
 			Assert.IsTrue( firstChanges > 100, $"{name}: first localized line is missing" );
-			Assert.IsTrue( secondChanges > 100, $"{name}: second localized line is missing" );
+			// Signs whose second localized line is empty are shipped that way, so only assert the
+			// draw difference for lines that actually have text.
+			if ( text.Second.Length != 0 )
+				Assert.IsTrue( secondChanges > 100, $"{name}: second localized line is missing" );
 		}
+	}
+
+	private static byte[] FontFixture( byte[] text, int platform = 3, int encoding = 1 )
+	{
+		var data = new byte[46 + text.Length];
+		void U16( int offset, int value ) { data[offset] = (byte)(value >> 8); data[offset + 1] = (byte)value; }
+		void U32( int offset, int value ) { for ( int i = 0; i < 4; ++i ) data[offset + i] = (byte)(value >> (24 - i * 8)); }
+		U32( 0, 0x10000 ); U16( 4, 1 );
+		System.Text.Encoding.ASCII.GetBytes( "name" ).CopyTo( data, 12 );
+		U32( 20, 28 ); U32( 24, 18 + text.Length );
+		U16( 30, 1 ); U16( 32, 18 ); U16( 34, platform ); U16( 36, encoding ); U16( 40, 1 ); U16( 42, text.Length );
+		text.CopyTo( data, 46 );
+		return data;
+	}
+
+	[TestMethod]
+	public void CollectionFacesAndUnknownRequestsCannotMatchAnotherFace()
+	{
+		var one = FontFixture( System.Text.Encoding.BigEndianUnicode.GetBytes( "FaceOne" ) );
+		var two = FontFixture( System.Text.Encoding.BigEndianUnicode.GetBytes( "FaceTwo" ) );
+		var ttc = new byte[20 + one.Length + two.Length];
+		void U32( int offset, int value ) { for ( int i = 0; i < 4; ++i ) ttc[offset + i] = (byte)(value >> (24 - i * 8)); }
+		System.Text.Encoding.ASCII.GetBytes( "ttcf" ).CopyTo( ttc, 0 ); U32( 4, 0x10000 ); U32( 8, 2 );
+		U32( 12, 20 ); U32( 16, 20 + one.Length ); one.CopyTo( ttc, 20 ); two.CopyTo( ttc, 20 + one.Length );
+		U32( 40, 48 ); U32( 40 + one.Length, 48 + one.Length );
+		var faces = LobbySigns.FontNames.Read( ttc );
+		Assert.AreEqual( 2, faces.Count );
+		Assert.IsFalse( LobbySigns.NativeFont.FaceMatches( "FaceTwo", "FaceOne", faces ) );
+		Assert.IsFalse( LobbySigns.NativeFont.FaceMatches( "FaceOne", "NoSuchSignFace", faces ) );
+		Assert.IsTrue( LobbySigns.NativeFont.FaceMatches( "faceone", "FaceOne", faces ) );
+	}
+
+	[TestMethod]
+	public void FontNamesDecodeMacRomanAndRejectInvalidLengths()
+	{
+		var faces = LobbySigns.FontNames.Read( FontFixture( new byte[] { 0x80 }, 1, 0 ) );
+		Assert.IsTrue( faces[0].Contains( "Ä" ) );
+		Assert.AreEqual( 0, LobbySigns.FontNames.Read( FontFixture( new byte[] { 0x80 }, 1, 1 ) ).Count );
+		Assert.ThrowsException<InvalidDataException>( () => LobbySigns.FontNames.Read( FontFixture( new byte[] { 0x41 } ) ) );
+		var truncated = new byte[16]; System.Text.Encoding.ASCII.GetBytes( "ttcf" ).CopyTo( truncated, 0 );
+		truncated[8] = 0x40; truncated[11] = 1;
+		Assert.ThrowsException<InvalidDataException>( () => LobbySigns.FontNames.Read( truncated ) );
+		Assert.IsTrue( LobbySigns.NativeFont.FaceMatches( "Exact", "Exact", LobbySigns.FontNames.Read( new byte[0] ) ) );
+		Assert.IsFalse( LobbySigns.NativeFont.FaceMatches( "Other", "Exact", LobbySigns.FontNames.Read( new byte[0] ) ) );
+	}
+
+	[TestMethod]
+	public void NonEmptySecondLineStillContributesToTheSign()
+	{
+		GameData.Require();
+		byte[] data = FileSystem.ReadAllBytes( "lobby/terrain/Jun_isle.sgn" );
+		var both = LobbySigns.Compose( data, "第一行", "第二行" );
+		var first = LobbySigns.Compose( data, "第一行", "" );
+		int changed = 0;
+		for ( int i = 0; i < both.Data.Length; ++i ) if ( both.Data[i] != first.Data[i] ) ++changed;
+		Assert.IsTrue( changed > 100 );
 	}
 
 }
