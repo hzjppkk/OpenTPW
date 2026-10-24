@@ -10,11 +10,16 @@ public class Level
 	public Sun SunLight { get; set; }
 	public LobbyConfig? Lobby { get; private set; }
 	public Sky? EnvironmentSky { get; private set; }
+	public AudioSystem? Audio { get; }
+	public LobbyAudio? LobbySound { get; }
+	public LobbyAdvisor? Advisor { get; private set; }
 
 	public SettingsFile Global { get; private init; }
 
-	public Level( string levelName )
+	public Level( string levelName, AudioSystem? audio = null )
 	{
+		Audio = audio;
+		LobbySound = audio == null ? null : new LobbyAudio( audio );
 		Global = new SettingsFile( $"/levels/{levelName}/global.sam" );
 		Current = this;
 
@@ -32,7 +37,7 @@ public class Level
 		Lobby = LobbyConfig.Load();
 		var lobbyRandom = new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
 		LobbyCameraMode.Configure( Lobby, lobbyRandom );
-		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby, lobbyRandom );
+		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby, lobbyRandom, Audio );
 		var islands = new Dictionary<int, LobbyIsland>();
 		foreach ( var island in Lobby.Islands )
 		{
@@ -54,14 +59,22 @@ public class Level
 
 		var layout = new LobbyLayout() { Hud = Hud };
 		layout.OnInit();
+		if ( Audio != null )
+		{
+			Advisor = new LobbyAdvisor( Audio );
+			Advisor.Welcome( LobbyPlayerProfiles.Read().Any( player => player != null ) );
+			Hud.AddChild( new LobbyAdvisorPanel( Advisor ) );
+		}
 
 		Hud.AddChild( new Cursor() );
 	}
 
 	public void Update()
 	{
+		Audio?.Update();
 		// 0x5db430 updates the camera before calculating distance-controlled weather.
 		Camera.Update();
+		LobbySound?.SetIsland( LobbyCameraMode.CurrentIsland.ThemeName );
 		// Flocks can add model entities while replenishing their actor list.
 		foreach ( var entity in Entity.All.ToArray() ) entity.Update();
 		if ( Lobby != null ) LobbyNavigation.Draw( Lobby );

@@ -15,6 +15,8 @@ internal sealed class LobbyWeatherSimulation
 	private readonly Func<uint> seed;
 	internal List<Bolt> Bolts { get; } = new();
 	internal bool Flash { get; private set; }
+	internal event Action? ThunderRequested;
+	internal event Action<int>? AmbientRequested;
 	internal bool ConsumeFlash()
 	{
 		bool requested = Flash;
@@ -43,9 +45,14 @@ internal sealed class LobbyWeatherSimulation
 			if ( Bolts.Count < 16 )
 				Bolts.Add( new Bolt { Bottom = new( bottomX, bottomY, 0 ), Top = new( x, y, 500 ), Seed = seed() | 1 } );
 			Flash = renderWeather;
+			ThunderRequested?.Invoke();
 		}
 		// The ambient sound choice consumes this same stream even when sound is unavailable.
-		if ( (random.Next() & 15) == 1 ) random.Next();
+		if ( (random.Next() & 15) == 1 )
+		{
+			int id = (int)(random.Next() % 3) + 3;
+			AmbientRequested?.Invoke( id );
+		}
 		if ( !renderWeather ) return;
 		for ( int i = Bolts.Count - 1; i >= 0; i-- )
 		{

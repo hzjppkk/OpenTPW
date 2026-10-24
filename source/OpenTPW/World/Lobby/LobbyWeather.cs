@@ -24,7 +24,7 @@ public sealed class LobbyWeather : ModelEntity
 	public LobbyWeather( Sky sky, Func<LobbyIslandConfig> currentIsland, LobbyConfig? config = null )
 		: this( sky, currentIsland, config, new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) ) ) { }
 
-	internal LobbyWeather( Sky sky, Func<LobbyIslandConfig> currentIsland, LobbyConfig? config, LobbyRandom random )
+	internal LobbyWeather( Sky sky, Func<LobbyIslandConfig> currentIsland, LobbyConfig? config, LobbyRandom random, AudioSystem? audio = null )
 	{
 		this.sky = sky;
 		this.currentIsland = currentIsland;
@@ -32,6 +32,11 @@ public sealed class LobbyWeather : ModelEntity
 		rainyCenters = config?.Islands.Where( island => island.Rainy ).Select( IslandPosition ).ToArray();
 		quality = LobbyQuality.Load();
 		simulation = new LobbyWeatherSimulation( random );
+		if ( audio != null )
+		{
+			simulation.ThunderRequested += () => audio.Play( "global/sound", "cat_globallobbysfx", 1 );
+			simulation.AmbientRequested += id => audio.Play( $"levels/{currentIsland().ThemeName}/Sound", "cat_locallobbysfx", (uint)id );
+		}
 		// The view overlay follows the world, before the later HUD screen pass.
 		Layer = RenderLayer.Ui;
 		Model = CreateModel( rainVertices, "raindrop.tga" );

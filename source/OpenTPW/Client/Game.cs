@@ -43,7 +43,9 @@ internal static class Game
 		//
 		// Create level
 		//
-		var level = new Level( "jungle" );
+		using var audio = new AudioSystem( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
+		if ( !audio.Available ) Log.Warning( $"Audio output unavailable: {audio.Failure}" );
+		var level = new Level( "jungle", audio );
 
 		//
 		// Run game loop
