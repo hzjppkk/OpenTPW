@@ -45,7 +45,10 @@ public sealed class SoundMixer : ISampleProvider
 	public int Read( float[] buffer, int offset, int count )
 	{
 		if ( count % WaveFormat.Channels != 0 ) throw new ArgumentException( "Audio read must contain complete frames", nameof(count) );
-		Array.Clear( buffer, offset, count );
+		// NAudio's WaveBuffer can expose a byte[] through its float[] overlay.
+		// Array.Clear uses the runtime array element size and would clear only count bytes.
+		// Typed stores clear count float samples, including when the backing array is bytes.
+		for ( int i = offset; i < offset + count; ++i ) buffer[i] = 0;
 		lock ( sync )
 		{
 			foreach ( var (handle, voice) in voices.ToArray() )

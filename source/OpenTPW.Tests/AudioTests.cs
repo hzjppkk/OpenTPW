@@ -8,6 +8,24 @@ namespace OpenTPW.Tests;
 [TestClass]
 public class AudioTests
 {
+	[TestMethod]
+	public void ReusedNAudioByteBufferDoesNotReplayOrAccumulatePreviousSamples()
+	{
+		var mixer = new SoundMixer();
+		var output = new NAudio.Wave.SampleProviders.SampleToWaveProvider( mixer );
+		var bytes = new byte[16];
+		mixer.Play( new[] { 0.1f, 0.2f, 0.3f, 0.4f } );
+		Assert.AreEqual( 16, output.Read( bytes, 0, 16 ) );
+		Assert.AreEqual( 0.4f, BitConverter.ToSingle( bytes, 12 ), 0.00001f );
+		Assert.AreEqual( 16, output.Read( bytes, 0, 16 ) );
+		CollectionAssert.AreEqual( new byte[16], bytes, "NAudio reuses its byte-backed float overlay after the voice ends" );
+		mixer.Play( new[] { 0.05f, 0.06f, 0.07f, 0.08f }, loop: true );
+		for ( int read = 0; read < 10; read++ )
+		{
+			output.Read( bytes, 0, bytes.Length );
+			Assert.AreEqual( 0.08f, BitConverter.ToSingle( bytes, 12 ), 0.00001f, "Previous output must not be added to the next mix" );
+		}
+	}
 	private static SoundCategoryMap Read( string directory, string category ) => SoundCategoryMap.Parse(
 		FileSystem.ReadAllBytes( $"{directory}/{category}BANK.map" ), FileSystem.ReadAllBytes( $"{directory}/{category}SFX.map" ) );
 
