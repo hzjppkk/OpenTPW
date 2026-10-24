@@ -4,10 +4,15 @@ namespace OpenTPW;
 public sealed class LobbyAdvisor
 {
 	// Response rows at 0x764a38: response ID, speech ID, lip ID, default gesture selector -1.
-	private static readonly Dictionary<int, uint> Responses = new()
+	private sealed record ResponseEntry( uint Speech, uint Lip, int CueMilliseconds = 0 );
+	private static readonly Dictionary<int, ResponseEntry> Responses = new()
 	{
-		[0x186] = 465, [0x187] = 466, [0x18e] = 471, [0x18a] = 469,
-		[0x23a] = 588, [0x250] = 611, [0x256] = 617
+		[0x186] = new( 465, 465 ), [0x187] = new( 466, 466 ), [0x18e] = new( 471, 471 ),
+		// Selector 28 (0x769a58) contains a 17000 ms cue and no gestures; 0x5950a0 falls back to the default sequence.
+		[0x189] = new( 468, 468, 17000 ), [0x18a] = new( 469, 469 ), [0x23a] = new( 588, 588 ),
+		[0x250] = new( 611, 611 ), [0x251] = new( 612, 612 ), [0x252] = new( 613, 613 ),
+		[0x253] = new( 614, 614 ), [0x254] = new( 615, 615 ), [0x255] = new( 616, 616 ),
+		[0x256] = new( 617, 617 ), [0x257] = new( 638, 0 ), [0x258] = new( 619, 619 )
 	};
 	private readonly AudioSystem audio;
 	private readonly Func<int> nextRandom;
@@ -24,6 +29,14 @@ public sealed class LobbyAdvisor
 	private long voice;
 	private uint sample;
 	private bool voiceStarted;
+	private bool cueSent;
+	private bool enabled = true;
+	public bool Enabled
+	{
+		get => enabled;
+		set { enabled = value; if ( !value ) Cancel(); }
+	}
+	public event Action<int>? ResponseCue;
 	public LobbyAdvisorGeometry Geometry { get; } = new();
 	public bool Active => sequence != null;
 	public int? Response { get; private set; }
@@ -49,16 +62,21 @@ public sealed class LobbyAdvisor
 	public void Say( int response, bool replace = false )
 	{
 		if ( !Responses.ContainsKey( response ) ) throw new ArgumentOutOfRangeException( nameof(response), $"Unimplemented advisor response {response:X}" );
+		// 0x595500 rejects playback while the player's AdvisorOn byte is clear.
+		if ( !Enabled ) return;
 		if ( !prepared.ContainsKey( response ) )
 		{
-			uint id = Responses[response];
+			var row = Responses[response];
+			uint id = row.Speech;
 			var map = audio.Assets.Category( "global/speech", "cat_speech" );
-			var sound = map.Sounds[id];
+			if ( !map.Sounds.TryGetValue( id, out var sound ) )
+				throw new InvalidDataException( $"Advisor response {response:X} references missing speech {id}" );
 			if ( sound.Definitions.Count != 1 || sound.Definitions[0].Samples.Count != 1 )
 				throw new InvalidDataException( "Advisor response requires a unique speech sample" );
 			var entry = sound.Definitions[0].Samples[0];
 			audio.Assets.Pcm( audio.Assets.Sample( "global/speech", map, entry ) );
-			byte[] boundaries = FileSystem.ReadAllBytes( $"global/speech/lips/sp_{id:000}.lip" );
+			// 0x595500 permits an absent LIP resource; row 0x257 explicitly uses lip ID zero.
+			byte[] boundaries = row.Lip == 0 ? BitConverter.GetBytes( -1 ) : FileSystem.ReadAllBytes( $"global/speech/lips/sp_{row.Lip:000}.lip" );
 			_ = new LobbyAdvisorLips( boundaries );
 			prepared.Add( response, new( id, checked((int)entry.DurationMilliseconds), boundaries ) );
 		}
@@ -89,6 +107,7 @@ public sealed class LobbyAdvisor
 			started = seconds;
 			segment = segmentStart = 0;
 			voiceStarted = false;
+			cueSent = false;
 		}
 		int elapsed = Math.Max( 0, (int)((seconds - started) * 1000) );
 		// 0x595500 starts at now-200, then offsets both speech and lip clock by 1000.
@@ -98,6 +117,14 @@ public sealed class LobbyAdvisor
 			voiceStarted = true;
 		}
 		lips!.Update( elapsed - 800, nextRandom );
+		int cue = Responses[Response!.Value].CueMilliseconds;
+		if ( !cueSent && cue != 0 && elapsed >= cue + 800 )
+		{
+			cueSent = true;
+			// 0x595d30 consumes the timed marker once, independently of gesture completion.
+			ResponseCue?.Invoke( Response.Value );
+			if ( sequence == null ) return;
+		}
 		// Animation completion advances one segment per game update (0x595e87).
 		int duration = durations[sequence.Segments[segment]];
 		if ( elapsed - segmentStart >= duration && segment + 1 < sequence.Segments.Length )

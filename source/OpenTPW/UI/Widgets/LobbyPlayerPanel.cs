@@ -79,6 +79,7 @@ internal sealed class LobbyPlayerPanel : Panel
 		level.Audio?.ConfigurePreferences( data.Preferences );
 		Profile = data;
 		level.Advisor?.Cancel();
+		if ( level.Advisor != null ) level.Advisor.Enabled = data.Preferences[32] != 0;
 		PlayerSelected?.Invoke( profile, data );
 	}
 	private void Cancel()

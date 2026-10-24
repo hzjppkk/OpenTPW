@@ -60,6 +60,14 @@ public class LobbyAdvisorPlaybackTests
 		advisor.Cancel();
 		Assert.IsFalse( advisor.Active );
 		Assert.AreEqual( 0, advisor.PendingCount );
+		advisor.Enabled = false;
+		advisor.Welcome( false );
+		Assert.AreEqual( 0, advisor.PendingCount );
+		advisor.Enabled = true;
+		advisor.Welcome( true );
+		Assert.AreEqual( 1, advisor.PendingCount );
+		advisor.Enabled = false;
+		Assert.AreEqual( 0, advisor.PendingCount );
 		foreach ( string name in new[] { "mouth - normal", "mouth - aah", "mouth - eee", "mouth - ooh", "mouth - sss" } )
 			Assert.AreEqual( 1, advisor.Geometry.Model.Meshes.Count( mesh => mesh.Name.Equals( name, StringComparison.OrdinalIgnoreCase ) ) );
 	}
@@ -70,12 +78,37 @@ public class LobbyAdvisorPlaybackTests
 		GameData.Require();
 		using var audio = new AudioSystem( 1, false );
 		var advisor = new LobbyAdvisor( audio, () => 0 );
-		foreach ( int response in new[] { 0x186, 0x187, 0x18e, 0x18a, 0x23a, 0x250, 0x256 } )
+		foreach ( int response in new[] { 0x186, 0x187, 0x18e, 0x189, 0x18a, 0x23a, 0x250, 0x251, 0x252, 0x253, 0x254, 0x255, 0x256, 0x258 } )
 		{
 			advisor.Say( response, true );
 			advisor.Update( 0 );
 			Assert.AreEqual( response, advisor.Response );
 			Assert.IsTrue( advisor.Active );
 		}
+		var error = Assert.ThrowsException<InvalidDataException>( () => advisor.Say( 0x257 ) );
+		StringAssert.Contains( error.Message, "missing speech 638" );
+	}
+
+	[TestMethod]
+	public void NewPlayerIntroductionKeepsTheNativeTimedCueAndCancelsItOnReplacement()
+	{
+		GameData.Require();
+		using var audio = new AudioSystem( 1, false );
+		var advisor = new LobbyAdvisor( audio, () => 0 );
+		int cues = 0;
+		advisor.ResponseCue += response => { Assert.AreEqual( 0x189, response ); cues++; };
+		advisor.Say( 0x189 );
+		advisor.Update( 0 );
+		advisor.Update( 17.799 );
+		Assert.AreEqual( 0, cues );
+		advisor.Update( 17.8 );
+		advisor.Update( 18 );
+		Assert.AreEqual( 1, cues );
+		advisor.Say( 0x189, true );
+		advisor.Update( 20 );
+		advisor.Say( 0x258, true );
+		advisor.Update( 40 );
+		advisor.Update( 58 );
+		Assert.AreEqual( 1, cues );
 	}
 }
