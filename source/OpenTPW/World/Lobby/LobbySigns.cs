@@ -10,6 +10,8 @@ public static class LobbySigns
 
 	public static Texture? Resolve( string modelPath, string materialName, string title )
 	{
+		// Only the two generated halves belong to the SGN atlas. Other material names
+		// must continue through normal texture resolution rather than borrowing sign pixels.
 		if ( !materialName.Equals( "sign1", StringComparison.OrdinalIgnoreCase ) &&
 			!materialName.Equals( "sign2", StringComparison.OrdinalIgnoreCase ) ) return null;
 		var path = Path.ChangeExtension( modelPath, ".sgn" );

@@ -35,7 +35,7 @@ internal sealed class LobbyGlobePanel : Panel
 		Button( 0x16004, 0xf1d0542a, Box( 307, 1201, 460, 1355 ) );
 		Button( 0x16005, 0xee357a41, Box( 182, 1077, 336, 1231 ) );
 		Button( 0x16006, 0x19de04e0, Box( 41, 1070, 143, 1173 ) );
-		status = new( "", Box( 520, 1380, 2047, 1530 ) );
+		status = new( "", Box( 520, 1380, 2047, 1530 ), LobbyFonts.Name( 4 ) );
 	}
 	public void Show( LobbyGlobeMode mode )
 	{
@@ -58,11 +58,13 @@ internal sealed class LobbyGlobePanel : Panel
 		rightDown = Input.Mouse.Right;
 		// 0x5b4910/0x5b4860 request City::GetCityList even on the deferred connection path.
 		// No local city records are shipped by this path, so do not manufacture map markers.
-		status.Text = "Online cities are not supported in this build.";
+		status.Text = Localization.Parse( "#Disconnected" );
+		Log.Info( "Globe opened offline; online city and park lists are unavailable." );
 	}
 	public void Hide()
 	{
 		if ( !Active ) return;
+		// The globe owns both global loops. Restore island ambience on the next Level update.
 		Active = false; globe!.Visible = false;
 		level.Audio?.Stop( sound2 ); level.Audio?.Stop( sound3 ); sound2 = sound3 = 0;
 		Camera.SetCameraMode<LobbyCameraMode>();
@@ -83,6 +85,8 @@ internal sealed class LobbyGlobePanel : Panel
 		foreach ( var (id, button) in buttons )
 		{
 			if ( Mode == LobbyGlobeMode.Select && id is 0x16000 or 0x16003 ) continue;
+			// The local lobby has no online city provider. Do not expose an enabled list action with no result.
+			if ( id == 0x16003 ) { button.Model.State = 1; continue; }
 			bool hover = LobbyNamingPanel.Hit( button.Bounds );
 			bool selected = id == 0x16006 && CameraState.Zoomed;
 			button.Model.State = hover ? Input.Mouse.Left || selected ? 3 : 2 : selected ? 5 : 0;
@@ -105,6 +109,7 @@ internal sealed class LobbyGlobePanel : Panel
 	protected override void OnRender()
 	{
 		if ( !Active ) return;
+		// Select mode omits the visit-only return/list models from the authored control table.
 		background.Draw();
 		foreach ( var (id, button) in buttons )
 			if ( Mode != LobbyGlobeMode.Select || id is not (0x16000 or 0x16003) ) button.Model.Draw();

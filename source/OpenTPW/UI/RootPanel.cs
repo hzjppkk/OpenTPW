@@ -21,6 +21,7 @@ public class RootPanel : Entity
 
 	protected override void OnUpdate()
 	{
+		// A modal owns input dispatch only. Scene audio and particle clocks run in Level.Update.
 		if ( Modal != null ) Modal.Update();
 		else Children.ForEach( child => child.Update() );
 	}

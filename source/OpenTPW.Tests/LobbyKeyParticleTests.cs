@@ -46,6 +46,19 @@ public class LobbyKeyParticleTests
 		Assert.ThrowsException<ArgumentOutOfRangeException>( () => Create().Start( 1, 0, 0 ) );
 	}
 	[TestMethod]
+	public void AffordableKeySparklePersistsAndDrainsAfterPageDeparture()
+	{
+		var state = Create(); state.Start( 97, 50000, 14794 );
+		// The authored emitter has a frozen life field, but its individual sprites expire.
+		for ( int i = 0; i < 300; i++ ) state.Tick();
+		Assert.IsTrue( state.Particles.Any() );
+		Assert.IsTrue( state.Particles.All( p => p.Sequence == 12 && p.Life <= 17 ) );
+		state.Stop( 97 );
+		Assert.IsTrue( state.Particles.Any(), "Stopping births must retain existing sprites" );
+		for ( int i = 0; i < 25; i++ ) state.Tick();
+		Assert.IsFalse( state.Particles.Any(), "Leaving an affordable island must drain the effect" );
+	}
+	[TestMethod]
 	public void FixedParticleClockIsIndependentOfRenderFrameSplits()
 	{
 		var a = Create(); var b = Create(); a.Start( 87, 90000, 7000 ); b.Start( 87, 90000, 7000 );

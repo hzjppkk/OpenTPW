@@ -107,6 +107,8 @@ public static partial class Input
 		LeftPressed = inputSnapshot.MouseEvents.Any( mouse => mouse.MouseButton == MouseButton.Left && mouse.Down ) || mouseInfo.Left && !Mouse.Left;
 		Mouse = mouseInfo;
 		Text = new string( inputSnapshot.KeyCharPresses.ToArray() );
+		// Retain key-down events even when a short press is released in the same snapshot.
+		// Text entry and command keys are separate SDL streams; neither should consume the other.
 		pressedKeys = inputSnapshot.KeyEvents.Where( key => key.Down ).Select( key => key.Key ).ToHashSet();
 
 		Right = 0;

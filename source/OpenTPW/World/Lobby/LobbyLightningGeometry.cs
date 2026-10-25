@@ -18,6 +18,7 @@ internal sealed class LobbyLightningGeometry
 		var b = Native( bottom );
 		direction = N.Vector3.Normalize( b - a );
 		var points = new List<Vector3> { bottom };
+		// Match 0x57ae20's recursive emission order: the low endpoint is submitted first.
 		Split( a, b, 0, points );
 		strokes.Add( new Stroke( 0, points ) );
 		return strokes;

@@ -83,6 +83,8 @@ public sealed class LobbyModel : Entity
 				for ( int i = 0; i < vertices.Length; i++ )
 				{
 					int textureIndex = (int)mesh.Vertices[i].TextureIndex;
+					// Preserve authored UVs. WCT row order is paired with test.shader's single V flip;
+					// wrapping is selected per batch, not by modifying coordinates at load time.
 					vertices[i].TexCoords = mesh.TexCoords[i];
 					vertices[i].TexIndex = Math.Clamp( textureIndex - batch.FirstMaterial, 0, 15 );
 					vertices[i].MatFlags = textureIndex < mesh.Materials.Length ? mesh.Materials[textureIndex].Flags : 0;

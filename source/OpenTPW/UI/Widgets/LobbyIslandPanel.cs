@@ -12,6 +12,7 @@ internal sealed class LobbyIslandPanel : Panel
 	public event Action? GlobeRequested;
 	public bool Active { get; set; } = true;
 	private ulong activatedFrame;
+	// Do not let the click that left the previous page activate a newly visible control.
 	public void Activate() { Active = true; activatedFrame = Input.FrameNumber; }
 	public string Failure { get => error.Text; set => error.Text = value; }
 	private static Rectangle Box( float l, float t, float r, float b ) => LobbyNamingPanel.Box( l, t, r, b );
@@ -44,10 +45,10 @@ internal sealed class LobbyIslandPanel : Panel
 		enter.State = State( EnterBox ); globe.State = State( GlobeBox );
 		next.State = State( NextBox ); previous.State = State( PreviousBox );
 		bool Click( Rectangle bounds ) => Input.LeftPressed && LobbyNamingPanel.Hit( bounds );
-		// 0x4b65d0 maps the visual left button (0x1e0f0) to vtable +0x34,
-		// and the visual right button (0x1e0f1) to +0x30: opposite the keyboard handlers.
-		if ( Input.Pressed( Key.Left ) || Click( PreviousBox ) ) { Failure = ""; navigation.Navigate( 1 ); }
-		else if ( Input.Pressed( Key.Right ) || Click( NextBox ) ) { Failure = ""; navigation.Navigate( -1 ); }
+		// 0x4b65d0 and 0x5dc310 both route left to vtable +0x34 (previous)
+		// and right to +0x30 (next); the model resource names do not define direction.
+		if ( Input.Pressed( Key.Left ) || Click( NextBox ) ) { Failure = ""; navigation.Navigate( -1 ); }
+		else if ( Input.Pressed( Key.Right ) || Click( PreviousBox ) ) { Failure = ""; navigation.Navigate( 1 ); }
 		else if ( Input.Pressed( Key.Enter ) || Click( EnterBox ) ) { Failure = ""; navigation.Enter(); }
 		else if ( Click( GlobeBox ) ) GlobeRequested?.Invoke();
 	}
@@ -55,6 +56,7 @@ internal sealed class LobbyIslandPanel : Panel
 	{
 		if ( !Active || !navigation.Active || navigation.Entering ) return;
 		background.Draw(); enter.Draw(); globe.Draw(); next.Draw(); previous.Draw();
+		// 0x4b6da0 selects separate authored frames for affordable and locked key costs.
 		key.State = navigation.CanEnter ? 0 : 1;
 		cost.State = navigation.RequiredKeys + (navigation.CanEnter ? -1 : 4);
 		key.Draw(); cost.Draw();

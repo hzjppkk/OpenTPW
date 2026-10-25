@@ -139,6 +139,8 @@ public sealed class LobbyWeather : ModelEntity
 					return new( tangent.Y, -tangent.X, 0, 0 );
 				}
 				for ( int i = 0; i < points.Length - 1; i++ )
+					// 0x57a320 submits the previous edge at Vmin and the next edge at Vmax.
+					// 0x57ae20 traverses from the lower endpoint; unlike rain, this path does not reverse V.
 					Quad( boltVertices, ref boltOffset, points[i] - Side( i ), points[i] + Side( i ), points[i + 1] - Side( i + 1 ), points[i + 1] + Side( i + 1 ), brightness, 255, 255 );
 			}
 		}

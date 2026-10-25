@@ -106,7 +106,8 @@ public class Level
 			{
 				if ( response == 0x189 )
 				{
-					Audio.Play( "global/sound", "cat_globallobbysfx", 0xc6 );
+					// 0x595d30 pairs emitter 87 with the separately registered UI sound category.
+					LobbySound!.IntroductionKey();
 					keyEffects?.IntroductionKey();
 				}
 			};
@@ -122,6 +123,11 @@ public class Level
 	public void Update()
 	{
 		Audio?.Update();
+		// 0x54a970 updates 0x595d30 and the particle clock outside UI dispatch.
+		// Modal input routing must not freeze speech/lips or the authored particle chain.
+		Advisor?.Update( Time.Now );
+		keyEffects?.SetAffordable( IslandMenu?.Active == true && Navigation?.CanEnter == true );
+		keyEffects?.Advance( Time.Delta );
 		// 0x5db430 updates the camera before calculating distance-controlled weather.
 		Camera.Update();
 		if ( GlobeMenu?.Active != true ) LobbySound?.SetIsland( LobbyCameraMode.CurrentIsland.ThemeName );

@@ -46,7 +46,8 @@ internal sealed class LobbyAdvisorPanel : Panel
 		}
 	}
 
-	protected override void OnUpdate() => advisor.Update( Time.Now );
+	// Playback is advanced by Level, outside modal input routing (0x54a970).
+	// This panel only projects the current pose; updating here would pause it in dialogs.
 	protected override void OnDelete() => advisor.Cancel();
 	protected override void OnRender()
 	{
@@ -54,6 +55,7 @@ internal sealed class LobbyAdvisorPanel : Panel
 		var pose = advisor.Geometry.Pose( advisor.Animation, advisor.Frame );
 		foreach ( var part in parts )
 		{
+			// Mouth meshes are selected by LIP state; all other nodes follow segment hiding.
 			int index = part.Mesh;
 			if ( mouths.TryGetValue( index, out int mouth ) ? mouth != advisor.Mouth : pose.Hidden[index] ) continue;
 			var mesh = advisor.Geometry.Model.Meshes[index];

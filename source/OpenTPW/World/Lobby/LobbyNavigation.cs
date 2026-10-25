@@ -31,6 +31,7 @@ public sealed class LobbyNavigation
 	}
 	public void Bind( PlayerProfileFile player )
 	{
+		// A new player selection starts at the first configured island, never a stale entry state.
 		profile = player ?? throw new ArgumentNullException( nameof(player) );
 		Entering = false;
 		index = 0;
@@ -39,11 +40,13 @@ public sealed class LobbyNavigation
 	public void Navigate( int direction )
 	{
 		if ( !Active || Entering ) return;
+		// Normalize negative modulo as well: the previous-island control wraps at index zero.
 		index = ((index + direction) % config.Islands.Count + config.Islands.Count) % config.Islands.Count;
 		IslandSelected?.Invoke( Island.Id );
 	}
 	public bool Enter()
 	{
+		// Lock selection before notifying the camera so repeated input cannot queue two entries.
 		if ( !CanEnter ) return false;
 		Entering = true;
 		EntryRequested?.Invoke();

@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 
 namespace OpenTPW;
 
-/// <summary>The two screen-space key effects from 0x595d30 and 0x4b6a30.</summary>
+/// <summary>Screen-space key effects from 0x595d30, 0x4b6a30 and 0x4b6b50.</summary>
 internal sealed class LobbyKeyParticles
 {
 	internal sealed class Particle
@@ -17,7 +17,7 @@ internal sealed class LobbyKeyParticles
 	private sealed class Emitter
 	{
 		internal byte[] Data = null!;
-		internal int X, Y, Z, Life, InitialLife, Countdown, InitialCount, Limit;
+		internal int Id, X, Y, Z, Life, InitialLife, Countdown, InitialCount, Limit;
 		internal int[] Rates = new int[4];
 		internal List<Particle> Particles = new();
 		internal int Int( int offset ) => BinaryPrimitives.ReadInt32LittleEndian( Data.AsSpan( offset, 4 ) );
@@ -60,10 +60,11 @@ internal sealed class LobbyKeyParticles
 
 	internal void Start( int id, int x, int z )
 	{
-		if ( id is not (87 or 88 or 98) ) throw new ArgumentOutOfRangeException( nameof(id) );
-		var emitter = new Emitter { Data = library.AsSpan( 8 + id * 320, 320 ).ToArray(), X = x >> 4, Y = 0, Z = z >> 4 };
-		if ( emitter.Data[4] != 4 || emitter.Data[5] != 1 || emitter.Short( 0x0e ) != 0 ||
-			emitter.Short( 0x94 ) != (id == 88 ? 12 : 15) || emitter.Short( 0x96 ) != (id == 88 ? 16 : 1) || emitter.Short( 0xa2 ) != 1000 ||
+		if ( id is not (87 or 88 or 97 or 98) ) throw new ArgumentOutOfRangeException( nameof(id) );
+		var emitter = new Emitter { Id = id, Data = library.AsSpan( 8 + id * 320, 320 ).ToArray(), X = x >> 4, Y = 0, Z = z >> 4 };
+		bool animated = id is 88 or 97;
+		if ( emitter.Data[4] != (id == 97 ? 0 : 4) || emitter.Data[5] != 1 || emitter.Short( 0x0e ) != 0 ||
+			emitter.Short( 0x94 ) != (animated ? 12 : 15) || emitter.Short( 0x96 ) != (animated ? 16 : 1) || emitter.Short( 0xa2 ) != 1000 ||
 			emitter.Int( 0x58 ) != 0 || emitter.Int( 0x98 ) != -1 )
 			throw new InvalidDataException( $"Unsupported key emitter {id}" );
 		// Even a spread of -1 consumes three RNG values although all three remainders are zero.
@@ -87,6 +88,12 @@ internal sealed class LobbyKeyParticles
 			if ( emitter.Int( 0xb4 ) != 5 || emitter.Data[0xba] != 1 ) throw new InvalidDataException( "Unsupported key child effect" );
 			AddInfluencer( 5, emitter );
 		}
+	}
+
+	internal void Stop( int id )
+	{
+		// 0x51c5d0 writes -2: stop births without firing the -1 end effect or killing live particles.
+		foreach ( var emitter in emitters.Where( emitter => emitter.Id == id ) ) emitter.Life = -2;
 	}
 
 	private void AddInfluencer( int id, Emitter emitter )
@@ -113,11 +120,21 @@ internal sealed class LobbyKeyParticles
 			p.Y += Signed( emitter.Int( 0x48 ) );
 			p.Z -= sine[angle] * Positive( emitter.Int( 0x4c ) ) * 4 >> 10;
 		}
-		int direction = ((Next() >> 16) & 0xfff) >> 3;
-		int speed = Positive( emitter.Int( 0x5c ) );
-		p.Vx = sine[(direction + 128) & 511] * speed * 4 >> 10;
-		p.Vy = Signed( emitter.Int( 0x5c ) );
-		p.Vz = sine[direction] * speed * 4 >> 10;
+		if ( emitter.Int( 0x5c ) != 0 )
+		{
+			int direction = ((Next() >> 16) & 0xfff) >> 3;
+			int speed = Positive( emitter.Int( 0x5c ) );
+			p.Vx = sine[(direction + 128) & 511] * speed * 4 >> 10;
+			p.Vy = Signed( emitter.Int( 0x5c ) );
+			p.Vz = sine[direction] * speed * 4 >> 10;
+		}
+		else
+		{
+			// 0x51cc80 skips the angular draw for zero radial speed (KeySparkle).
+			p.Vx = emitter.Int( 0x38 ) + Signed( emitter.Short( 0x50 ) );
+			p.Vy = emitter.Int( 0x3c ) + Signed( emitter.Short( 0x50 ) );
+			p.Vz = emitter.Int( 0x40 ) + Signed( emitter.Short( 0x50 ) );
+		}
 		emitter.Particles.Insert( 0, p );
 	}
 
@@ -134,7 +151,8 @@ internal sealed class LobbyKeyParticles
 		if ( ++steps < 2 ) return;
 		foreach ( var emitter in emitters.ToArray() )
 		{
-			emitter.Life--;
+			// +0x26 suppresses emitter ageing for KeySparkle; particle life still advances.
+			if ( emitter.Short( 0x26 ) == 0 ) emitter.Life--;
 			// Key -> attractor -> Key2 is an authored chain, not a second introduction event.
 			if ( emitter.Life == -1 && emitter.Short( 0x10 ) >= 0 )
 			{

@@ -61,6 +61,7 @@ internal sealed class LobbyPlayerPanel : Panel
 	private void Confirm( byte mode )
 	{
 		if ( !flow.CanConfirm ) return;
+		// Publish a complete profile before exposing the occupied slot or changing pages.
 		try
 		{
 			var profile = store.Create( flow.ActiveSlot, flow.ResolveName(), mode );
@@ -86,6 +87,7 @@ internal sealed class LobbyPlayerPanel : Panel
 	}
 	private void Commit( LobbyPlayerProfile profile )
 	{
+		// Apply the selected player's sound preferences before queuing the new-player speech.
 		var data = store.Load( profile );
 		level.Audio?.ConfigurePreferences( data.Preferences );
 		Profile = data;
@@ -107,6 +109,7 @@ internal sealed class LobbyPlayerPanel : Panel
 	}
 	protected override void OnUpdate()
 	{
+		// The naming dialog consumes this page's input until it confirms or cancels.
 		if ( naming.Active ) { naming.Update(); return; }
 		if ( !Browsing ) return;
 		if ( Input.Pressed( Key.Up ) ) focused = (focused + 4) % 5;

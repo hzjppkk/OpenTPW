@@ -111,4 +111,28 @@ public class LobbyAdvisorPlaybackTests
 		advisor.Update( 58 );
 		Assert.AreEqual( 1, cues );
 	}
+
+	[TestMethod]
+	public void IntroductionCueResolvesItsActualCategoryAndProducesAudio()
+	{
+		GameData.Require();
+		using var audio = new AudioSystem( 1, false );
+		using var lobby = new LobbyAudio( audio );
+		var advisor = new LobbyAdvisor( audio, () => 0 );
+		long cue = 0;
+		// Exercise the same timed response and production audio binding as Level.
+		// A timer-only test cannot detect a sound ID bound to the wrong category.
+		advisor.ResponseCue += response => cue = lobby.IntroductionKey();
+		advisor.Say( 0x189 );
+		advisor.Update( 0 );
+		advisor.Update( 17.799 );
+		Assert.AreEqual( 0L, cue );
+		advisor.Update( 17.8 );
+		Assert.IsTrue( audio.IsPlaying( cue ), "The actual TW UI cue must resolve and start" );
+		advisor.Cancel();
+		Assert.IsTrue( audio.IsPlaying( cue ), "The independent cue survives speech cancellation" );
+		var pcm = new float[44100];
+		audio.Mixer.Read( pcm, 0, pcm.Length );
+		Assert.IsTrue( pcm.Any( value => Math.Abs( value ) > 0.00001f ), "The cue must decode to audible PCM" );
+	}
 }

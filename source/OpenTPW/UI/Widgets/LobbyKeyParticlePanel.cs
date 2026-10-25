@@ -11,6 +11,7 @@ internal sealed class LobbyKeyParticlePanel : Panel
 	private readonly SpriteSequenceFile sequences;
 	private readonly SpriteTextureFile sprites;
 	private readonly int tileWidth, tileHeight, atlasWidth, atlasHeight;
+	private bool affordable;
 	internal LobbyKeyParticlePanel()
 	{
 		var settings = new SettingsFile( $"{LobbyQuality.Load().Preset}.sam" );
@@ -44,8 +45,16 @@ internal sealed class LobbyKeyParticlePanel : Panel
 	internal void IntroductionKey() => state.Start( 87, 90000, 7000 );
 	// 0x4b6a30 uses the integer centre of element 0x1e0ea (554,170)-(990,437).
 	internal void EnterIsland() => state.Start( 98, 50000, (170 + (437 - 170) / 2) * 75000 / 1536 );
+	internal void SetAffordable( bool value )
+	{
+		if ( affordable == value ) return;
+		affordable = value;
+		// 0x4b6b50/0x4b6da0 retain one sparkle emitter while the selected island is affordable.
+		if ( value ) state.Start( 97, 50000, (170 + (437 - 170) / 2) * 75000 / 1536 );
+		else state.Stop( 97 );
+	}
 	// The particle clock uses the frontend's elapsed milliseconds, independently of capped camera dt.
-	protected override void OnUpdate() => state.Advance( Time.Delta );
+	internal void Advance( float seconds ) => state.Advance( seconds );
 	protected override void OnRender()
 	{
 		Array.Clear( vertices );
@@ -63,6 +72,8 @@ internal sealed class LobbyKeyParticlePanel : Panel
 			float halfHeight = (particle.Size / 64) / 2048f;
 			float angle = (particle.Angle >> 8) * (MathF.Tau / 256);
 			float c = MathF.Cos( angle ), s = MathF.Sin( angle );
+			// The UI shader flips V once. Convert top-down atlas rows here while preserving
+			// the retail clockwise screen rotation and ARGB particle colour.
 			Vertex V( float dx, float dy, float u, float v ) => new(
 				new Vector3( x + dx * c + dy * s, -(y + dy * c - dx * s), 0 ),
 				new Vector3( ((particle.Colour >> 16) & 255) / 255f, ((particle.Colour >> 8) & 255) / 255f, (particle.Colour & 255) / 255f ),
