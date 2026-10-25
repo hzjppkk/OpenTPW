@@ -9,6 +9,20 @@ namespace OpenTPW.Tests;
 public class LobbyControlGeometryTests
 {
 	[TestMethod]
+	public void ConfirmationFontCoversTheTraditionalChineseQuitMessage()
+	{
+		GameData.Require();
+		var text = new StringFile( "Language/English/UITEXT.str" )[9];
+		var font = new FontFile( $"Language/English/{LobbyFonts.Name( 4 )}.bf4" );
+		Assert.IsTrue( text.Contains( '\n' ) );
+		foreach ( char character in text.Where( character => !char.IsWhiteSpace( character ) ) )
+		{
+			var glyph = font.GetGlyph( character );
+			Assert.IsNotNull( glyph, $"Missing quit message glyph U+{(int)character:X4}" );
+			Assert.IsTrue( glyph.Advance > 0 && glyph.Pixels.Any( pixel => pixel > 0 ) );
+		}
+	}
+	[TestMethod]
 	public void DialogBackgroundUsesRegisteredRootNameRatherThanFileName()
 	{
 		GameData.Require();
@@ -19,6 +33,11 @@ public class LobbyControlGeometryTests
 		Assert.IsTrue( path.EndsWith( "w_dialog_wave.MD2", StringComparison.OrdinalIgnoreCase ), path );
 		var model = new LobbyButtonGeometry( FileSystem.ReadAllBytes( path ) );
 		CollectionAssert.AreEqual( new[] { 0 }, model.VisibleMeshes );
+		var wave = model.Model.Meshes[0].Materials.Single( material => material.Name == "wave" );
+		Assert.AreEqual( 0x31u, wave.Flags );
+		Assert.AreEqual( SamplerType.PointWrap, LobbyUiModel.TextureSampler( wave.Flags ) );
+		Assert.AreEqual( SamplerType.PointWrap, LobbyUiModel.TextureSampler( 0x21 ) );
+		Assert.AreEqual( SamplerType.Point, LobbyUiModel.TextureSampler( 1 ) );
 		foreach ( var geometry in new[] { model, new LobbyButtonGeometry( FileSystem.ReadAllBytes( AnimationFiles.ResolveModel( "ui/LOLIGHT.md2" ) ) ) } )
 		foreach ( var material in geometry.Model.Meshes.SelectMany( mesh => mesh.Materials ) )
 		{

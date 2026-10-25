@@ -12,6 +12,7 @@ public sealed class LobbyModel : Entity
 	private static Shader? sharedShader;
 	private sealed class Part
 	{
+		public int MeshIndex;
 		public ModelFile.Mesh Mesh = null!;
 		public ModelEntity Entity = null!;
 		public Model Model = null!;
@@ -21,7 +22,7 @@ public sealed class LobbyModel : Entity
 	}
 
 	private readonly ModelFile modelFile;
-	private readonly Part[] parts;
+	private readonly List<Part> parts = new();
 	private ModelAnimation? animation;
 	private float startedAt;
 
@@ -40,56 +41,59 @@ public sealed class LobbyModel : Entity
 		if ( !ModelCache.TryGetValue( modelPath, out var loadedModel ) )
 			ModelCache[modelPath] = loadedModel = new ModelFile( modelPath );
 		modelFile = loadedModel;
-		parts = new Part[modelFile.Meshes.Count];
-
-		for ( int meshIndex = 0; meshIndex < parts.Length; meshIndex++ )
+		for ( int meshIndex = 0; meshIndex < modelFile.Meshes.Count; meshIndex++ )
 		{
 			var mesh = modelFile.Meshes[meshIndex];
-			var material = new Material<ObjectUniformBuffer>( sharedShader ??= new Shader( "content/shaders/test.shader" ) );
-			var textures = new Texture[16];
-			for ( int i = 0; i < textures.Length; i++ )
+			if ( mesh.Vertices.Length == 0 || mesh.Indices.Length == 0 ) continue;
+			foreach ( var batch in LobbyModelBatches.Create( mesh ) )
 			{
-				var name = i < mesh.Materials.Length ? mesh.Materials[i].Name?.TrimEnd( '\0' ) : null;
-				if ( string.IsNullOrEmpty( name ) )
-					textures[i] = whiteTexture ??= Texture.Missing;
-				else
+				var material = new Material<ObjectUniformBuffer>( sharedShader ??= new Shader( "content/shaders/test.shader" ) );
+				var textures = new Texture[16];
+				for ( int i = 0; i < textures.Length; i++ )
 				{
-					var texture = textureResolver?.Invoke( name );
-					if ( texture == null )
+					int materialIndex = batch.FirstMaterial + i;
+					var name = materialIndex < mesh.Materials.Length ? mesh.Materials[materialIndex].Name?.TrimEnd( '\0' ) : null;
+					if ( string.IsNullOrEmpty( name ) )
+						textures[i] = whiteTexture ??= Texture.Missing;
+					else
 					{
-						string texturePath = $"{textureDirectory}/{name}.wct";
-						try
+						var texture = textureResolver?.Invoke( name );
+						if ( texture == null )
 						{
-							texturePath = AnimationFiles.ResolveFile( texturePath, "Texture" );
+							string texturePath = $"{textureDirectory}/{name}.wct";
+							try
+							{
+								texturePath = AnimationFiles.ResolveFile( texturePath, "Texture" );
+							}
+							catch ( FileNotFoundException ) when ( name.Equals( "signgrab", StringComparison.OrdinalIgnoreCase ) )
+							{
+								// This unresolved retail material has no shipped WCT; retain its visible placeholder.
+								Log.Warning( $"Unimplemented lobby material {name} in {modelPath}: {texturePath}" );
+								texture = Texture.Missing;
+							}
+							if ( texture == null && !TextureCache.TryGetValue( texturePath, out texture ) )
+								TextureCache[texturePath] = texture = new Texture( texturePath, TextureFlags.Repeat );
 						}
-						catch ( FileNotFoundException ) when ( name.Equals( "signgrab", StringComparison.OrdinalIgnoreCase ) )
-						{
-							// This unresolved retail material has no shipped WCT; retain its visible placeholder.
-							Log.Warning( $"Unimplemented lobby material {name} in {modelPath}: {texturePath}" );
-							texture = Texture.Missing;
-						}
-						if ( texture == null && !TextureCache.TryGetValue( texturePath, out texture ) )
-							TextureCache[texturePath] = texture = new Texture( texturePath, TextureFlags.Repeat );
+						textures[i] = texture;
 					}
-					textures[i] = texture;
 				}
-			}
-			material.Set( "Color", textures );
+				material.Set( "Color", textures );
 
-			var vertices = new Vertex[mesh.Vertices.Length];
-			for ( int i = 0; i < vertices.Length; i++ )
-			{
-				int textureIndex = (int)mesh.Vertices[i].TextureIndex;
-				vertices[i].TexCoords = mesh.TexCoords[i];
-				vertices[i].TexIndex = textureIndex;
-				vertices[i].MatFlags = textureIndex < mesh.Materials.Length ? mesh.Materials[textureIndex].Flags : 0;
-			}
+				var vertices = new Vertex[mesh.Vertices.Length];
+				for ( int i = 0; i < vertices.Length; i++ )
+				{
+					int textureIndex = (int)mesh.Vertices[i].TextureIndex;
+					vertices[i].TexCoords = mesh.TexCoords[i];
+					vertices[i].TexIndex = Math.Clamp( textureIndex - batch.FirstMaterial, 0, 15 );
+					vertices[i].MatFlags = textureIndex < mesh.Materials.Length ? mesh.Materials[textureIndex].Flags : 0;
+				}
 
-			var part = new Part { Mesh = mesh, Vertices = vertices, World = mesh.WorldTransform };
-			Bake( part, null );
-			part.Model = new Model( vertices, mesh.Indices, material );
-			part.Entity = new ModelEntity { Model = part.Model, Position = Position, Rotation = Rotation, Scale = Scale };
-			parts[meshIndex] = part;
+				var part = new Part { MeshIndex = meshIndex, Mesh = mesh, Vertices = vertices, World = mesh.WorldTransform };
+				Bake( part, null );
+				part.Model = new Model( vertices, batch.Indices, material );
+				part.Entity = new ModelEntity { Model = part.Model, Position = Position, Rotation = Rotation, Scale = Scale };
+				parts.Add( part );
+				}
 		}
 
 		if ( animationPath != null )
@@ -134,9 +138,9 @@ public sealed class LobbyModel : Entity
 			pose = animation.Evaluate( modelFile, frame );
 		}
 
-		for ( int i = 0; i < parts.Length; i++ )
+		foreach ( var part in parts )
 		{
-			var part = parts[i];
+			int i = part.MeshIndex;
 			part.Entity.Position = Position;
 			part.Entity.Rotation = Rotation;
 			part.Entity.Scale = Scale;

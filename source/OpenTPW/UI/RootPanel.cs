@@ -5,6 +5,7 @@ namespace OpenTPW.UI;
 public class RootPanel : Entity
 {
 	public List<Panel> Children { get; set; } = new();
+	public Panel? Modal { get; set; }
 	public static RootPanel? Instance { get; set; }
 
 	public RootPanel()
@@ -20,7 +21,8 @@ public class RootPanel : Entity
 
 	protected override void OnUpdate()
 	{
-		Children.ForEach( child => child.Update() );
+		if ( Modal != null ) Modal.Update();
+		else Children.ForEach( child => child.Update() );
 	}
 
 	public T AddChild<T>( T? obj = null ) where T : Panel

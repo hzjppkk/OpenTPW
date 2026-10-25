@@ -145,7 +145,7 @@ fragment {
         // Calculate fog using view space depth
         float viewSpaceDepth = length(vs_out.vWorldPosition);
         float fogFactor = exp(viewSpaceDepth * 0.01) * 0.025;
-        fogFactor = clamp( fogFactor, 0, 1 );
+        fogFactor = clamp( fogFactor, 0, 1 ) * g_oUbo.g_vFogColor.w;
         
         // Mix with fog
         fragColor.xyz = mix(fragColor.xyz, g_oUbo.g_vFogColor.xyz, fogFactor);

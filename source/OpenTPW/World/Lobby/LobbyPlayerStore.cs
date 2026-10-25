@@ -32,6 +32,9 @@ public sealed class LobbyPlayerStore
 		if ( !flow.CanConfirm || flow.ResolveName() != name ) throw new ArgumentException( "Invalid player name", nameof(name) );
 		if ( ReadSlots()[slot] != null ) throw new IOException( "Player slot is already occupied" );
 		var profileData = PlayerProfileFile.Create( creationMode, PlayerProfileFile.DefaultPreferences( new SettingsFile( data.OpenRead( "sound.sam" ) ) ) );
+		// Normal lobby creation grants one key before saving (0x4a44e0 -> 0x5ac050 -> 0x5c3b00).
+		// Keep this inside the staged transaction so retries cannot grant another key to an occupied slot.
+		LobbyPlayerProgress.GrantIntroductionKey( profileData );
 		string destination = Path.Combine( users, $"{slot + 1}{name}" );
 		Directory.CreateDirectory( users );
 		string staging = Path.Combine( users, ".create-" + Guid.NewGuid().ToString( "N" ) );

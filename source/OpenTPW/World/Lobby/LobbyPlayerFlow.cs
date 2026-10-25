@@ -181,7 +181,7 @@ public sealed class LobbyPlayerFlow
 
 	private static bool IsValidSlot( int slot ) => slot >= 0 && slot < SlotCount;
 
-	private static string Filter( string? candidate )
+	internal static string Filter( string? candidate )
 	{
 		if ( string.IsNullOrEmpty( candidate ) )
 			return "";

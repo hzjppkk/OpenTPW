@@ -45,6 +45,8 @@ public class PlayerProfileFileTests
 		byte[] bytes = stream.ToArray();
 		var profile = PlayerProfileFile.Read( bytes );
 		Assert.AreEqual( "space", profile.Segments[1].Name );
+		Assert.AreEqual( 5 + BitConverter.ToInt32( profile.Prefix, 10 ), LobbyPlayerProgress.KeyCount( profile, new[] { "jungle", "space" } ) );
+		Assert.AreEqual( 3 + BitConverter.ToInt32( profile.Prefix, 10 ), LobbyPlayerProgress.KeyCount( profile, new[] { "JUNGLE" } ) );
 		CollectionAssert.AreEqual( bytes, profile.Write() );
 		BitConverter.GetBytes( uint.MaxValue ).CopyTo( bytes, 21 );
 		Assert.ThrowsException<InvalidDataException>( () => PlayerProfileFile.Read( bytes ) );
@@ -61,9 +63,11 @@ public class PlayerProfileFileTests
 			var profile = store.Create( 2, "Test", 1 );
 			Assert.AreEqual( 2, store.ReadSlots()[2]!.Slot );
 			Assert.AreEqual( 1, store.Load( profile ).CreationMode );
+			Assert.AreEqual( 1, LobbyPlayerProgress.KeyCount( store.Load( profile ), new[] { "jungle", "fantasy", "hallow", "space" } ) );
 			Assert.IsTrue( File.Exists( Path.Combine( profile.Directory, "jungle", "easymode.TPWI" ) ) );
 			CollectionAssert.AreEqual( FileSystem.ReadAllBytes( "levels/jungle/easymode.TPWI" ), File.ReadAllBytes( Path.Combine( profile.Directory, "jungle", "easymode.TPWI" ) ) );
 			Assert.ThrowsException<IOException>( () => store.Create( 2, "Other", 0 ) );
+			Assert.AreEqual( 1, LobbyPlayerProgress.KeyCount( store.Load( profile ), new[] { "jungle" } ), "An occupied-slot retry must not award another introduction key" );
 			Assert.ThrowsException<ArgumentException>( () => store.Create( 1, "../Invalid", 0 ) );
 			Assert.AreEqual( 1, Directory.GetDirectories( directory ).Length );
 		}

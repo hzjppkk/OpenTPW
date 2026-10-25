@@ -9,6 +9,7 @@ public static partial class Input
 	public static KeyboardInfo Keyboard { get; internal set; } = new();
 	public static string Text { get; private set; } = "";
 	public static bool LeftPressed { get; private set; }
+	public static ulong FrameNumber { get; private set; }
 	private static HashSet<Key> pressedKeys = new();
 	public static bool Pressed( Key key ) => pressedKeys.Contains( key );
 
@@ -89,6 +90,7 @@ public static partial class Input
 
 	public static void UpdateFrom( InputSnapshot inputSnapshot )
 	{
+		FrameNumber++;
 		IsSystemCursorVisible = true;
 
 		var mousePos = new Vector2( inputSnapshot.MousePosition.X, inputSnapshot.MousePosition.Y );

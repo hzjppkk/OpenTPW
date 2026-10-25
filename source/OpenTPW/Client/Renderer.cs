@@ -176,6 +176,7 @@ public partial class Renderer
 		_lastFrame = DateTime.Now;
 
 		InputSnapshot inputSnapshot = Window.SdlWindow.PumpEvents();
+		if ( !Window.SdlWindow.Exists ) return;
 
 		Time.Update( deltaTime );
 		Input.UpdateFrom( inputSnapshot );
@@ -187,11 +188,13 @@ public partial class Renderer
 		else
 			imGuiRenderer.Update( Math.Max( deltaTime, 0.001f ), inputSnapshot );
 
-		PreRender();
 		PreUpdate?.Invoke();
 
 		OnUpdate?.Invoke();
+		// A HUD callback can close the native window during this update.
+		if ( !Window.SdlWindow.Exists ) return;
 
+		PreRender();
 		PostRender();
 		PostUpdate?.Invoke();
 

@@ -5,36 +5,40 @@ namespace OpenTPW;
 /// <summary>A model control fitted through the native 2048x1536 UI coordinate space.</summary>
 internal sealed class LobbyUiModel : Panel
 {
-	private readonly Dictionary<int, List<Model>> states = new();
+	private sealed record Part( Model Model, Vertex[] Vertices, System.Numerics.Vector3[] Positions, LobbyButtonGeometry Geometry );
+	private readonly Dictionary<int, List<Part>> states = new();
 	private static readonly Dictionary<string, LobbyButtonGeometry> geometries = new( StringComparer.OrdinalIgnoreCase );
 	private static readonly Dictionary<string, Texture> textures = new( StringComparer.OrdinalIgnoreCase );
 	private static Shader? shader;
 	private readonly string modelName;
-	private readonly Rectangle units;
+	public Rectangle Bounds { get; set; }
 	public int State { get; set; }
+	// 0x572440 maps frame bits 0x10/0x20 to texture bits 0x10000/0x20000;
+	// 0x57dd90 -> 0x563c50 then selects D3DTADDRESS_WRAP instead of CLAMP.
+	internal static SamplerType TextureSampler( uint frameFlags ) => (frameFlags & 0x30) != 0 ? SamplerType.PointWrap : SamplerType.Point;
 	public LobbyUiModel( string modelName, Rectangle units )
 	{
 		this.modelName = modelName.Replace( '\\', '/' );
-		this.units = units;
+		Bounds = units;
 		states.Add( 0, Build( 0 ) );
 	}
-	private List<Model> Build( int state )
+	private List<Part> Build( int state )
 	{
 		string key = $"{modelName}:{state}";
 		if ( !geometries.TryGetValue( key, out var geometry ) )
 			geometries.Add( key, geometry = new( FileSystem.ReadAllBytes( AnimationFiles.ResolveModel(
 				modelName.Contains( '/' ) ? modelName : $"ui/{modelName}.md2" ) ), state ) );
-		var parts = new List<Model>();
-		var frame = new Rectangle( units.X / 3.2f, units.Y / 3.2f, units.Width / 3.2f, units.Height / 3.2f );
+		var parts = new List<Part>();
 		shader ??= new Shader( "content/shaders/ui.shader" );
 		foreach ( int meshIndex in geometry.VisibleMeshes )
 		{
 			var mesh = geometry.Model.Meshes[meshIndex];
 			var vertices = new Vertex[mesh.Vertices.Length];
+			var positions = new System.Numerics.Vector3[vertices.Length];
 			for ( int i = 0; i < vertices.Length; i++ )
 			{
-				var point = System.Numerics.Vector3.Transform( mesh.Vertices[i].Position.GetSystemVector3(), mesh.WorldTransform );
-				vertices[i] = new Vertex( geometry.Project( point, frame ), mesh.TexCoords[i] );
+				positions[i] = System.Numerics.Vector3.Transform( mesh.Vertices[i].Position.GetSystemVector3(), mesh.WorldTransform );
+				vertices[i] = new Vertex( Vector3.Zero, mesh.TexCoords[i] );
 			}
 			for ( int m = 0; m < mesh.Materials.Length; m++ )
 			{
@@ -46,8 +50,8 @@ internal sealed class LobbyUiModel : Panel
 				if ( !textures.TryGetValue( name, out var texture ) )
 					textures.Add( name, texture = new Texture( AnimationFiles.ResolveFile( $"ui/textures/{name}.wct", "UI model texture" ), TextureFlags.PointFilter ) );
 				var material = new Material<ObjectUniformBuffer>( shader, MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
-				material.Set( "Color", texture );
-				parts.Add( new Model( vertices, indices.ToArray(), material ) );
+				material.Set( "Color", texture, TextureSampler( mesh.Materials[m].Flags ) );
+				parts.Add( new Part( new Model( vertices, indices.ToArray(), material ), (Vertex[])vertices.Clone(), positions, geometry ) );
 			}
 		}
 		return parts;
@@ -55,6 +59,12 @@ internal sealed class LobbyUiModel : Panel
 	protected override void OnRender()
 	{
 		if ( !states.TryGetValue( State, out var parts ) ) states.Add( State, parts = Build( State ) );
-		foreach ( var part in parts ) part.Draw();
+		var frame = new Rectangle( Bounds.X / 3.2f, Bounds.Y / 3.2f, Bounds.Width / 3.2f, Bounds.Height / 3.2f );
+		foreach ( var part in parts )
+		{
+			for ( int i = 0; i < part.Vertices.Length; i++ ) part.Vertices[i].Position = part.Geometry.Project( part.Positions[i], frame );
+			part.Model.UpdateVertices( part.Vertices );
+			part.Model.Draw();
+		}
 	}
 }

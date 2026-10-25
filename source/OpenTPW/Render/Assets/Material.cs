@@ -61,6 +61,7 @@ public partial class Material : Asset
 		CreateSampler( SamplerType.Point ),
 		CreateSampler( SamplerType.AnisotropicWrap ),
 		CreateSampler( SamplerType.AnisotropicRepeat ),
+		CreateSampler( SamplerType.PointWrap ),
 	];
 
 	private static Sampler CreateSampler( SamplerType type )
@@ -69,14 +70,14 @@ public partial class Material : Asset
 		{
 			SamplerType.Anisotropic or SamplerType.AnisotropicWrap or SamplerType.AnisotropicRepeat => SamplerFilter.Anisotropic,
 			SamplerType.Linear => SamplerFilter.MinLinear_MagLinear_MipLinear,
-			SamplerType.Point => SamplerFilter.MinPoint_MagPoint_MipPoint,
+			SamplerType.Point or SamplerType.PointWrap => SamplerFilter.MinPoint_MagPoint_MipPoint,
 			_ => throw new NotImplementedException()
 		};
 
 		var samplerAddressMode = type switch
 		{
 			SamplerType.Anisotropic or SamplerType.Linear or SamplerType.Point => SamplerAddressMode.Clamp,
-			SamplerType.AnisotropicWrap => SamplerAddressMode.Wrap,
+			SamplerType.AnisotropicWrap or SamplerType.PointWrap => SamplerAddressMode.Wrap,
 			SamplerType.AnisotropicRepeat => SamplerAddressMode.Mirror,
 			_ => throw new NotImplementedException()
 		};
@@ -130,10 +131,10 @@ public partial class Material : Asset
 		Render.ScheduleDelete( ClearBoundResources );
 	}
 
-	public void Set( string name, Texture texture )
+	public void Set( string name, Texture texture, SamplerType? sampler = null )
 	{
 		_boundResources[name] = texture.NativeTexture;
-		_boundResources["s_" + name] = Samplers[(int)texture.SamplerType];
+		_boundResources["s_" + name] = Samplers[(int)(sampler ?? texture.SamplerType)];
 
 		Render.ScheduleDelete( ClearBoundResources );
 	}

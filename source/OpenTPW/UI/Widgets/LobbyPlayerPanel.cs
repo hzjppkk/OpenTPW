@@ -12,6 +12,7 @@ internal sealed class LobbyPlayerPanel : Panel
 	private readonly PurpleButton[] players = new PurpleButton[4];
 	private readonly PurpleButton quit;
 	private readonly LobbyNamingPanel naming;
+	private readonly LobbyUiText failure = new( "", LobbyNamingPanel.Box( 500, 1100, 2000, 1250 ) );
 	private int focused;
 	public event Action<LobbyPlayerProfile, PlayerProfileFile>? PlayerSelected;
 	public event Action? QuitRequested;
@@ -41,17 +42,19 @@ internal sealed class LobbyPlayerPanel : Panel
 	private void Select( int slot )
 	{
 		if ( !flow.Select( slot ) ) return;
+		failure.Text = "";
 		if ( flow.State == LobbyPlayerFlowState.Naming )
 		{
 			level.Advisor?.Say( 0x23a, true );
 			naming.ShowError( "" );
-			naming.Active = true;
+			naming.Open();
 			return;
 		}
 		try { Commit( flow[slot]! ); }
 		catch ( Exception error ) when ( error is IOException or UnauthorizedAccessException )
 		{
 			flow.Back();
+			failure.Text = error.Message;
 			Log.Warning( $"Unable to load player: {error.Message}" );
 		}
 	}
@@ -69,7 +72,15 @@ internal sealed class LobbyPlayerPanel : Panel
 		}
 		catch ( Exception error ) when ( error is IOException or UnauthorizedAccessException )
 		{
-			naming.ShowError( error.Message );
+			if ( flow.State == LobbyPlayerFlowState.Committed )
+			{
+				// A published profile remains a valid occupied slot even if binding its next page fails.
+				flow.Reload( store.ReadSlots() );
+				RefreshButtons();
+				naming.Active = false;
+				failure.Text = error.Message;
+			}
+			else naming.ShowError( error.Message );
 			Log.Warning( $"Unable to create player: {error.Message}" );
 		}
 	}
@@ -80,6 +91,7 @@ internal sealed class LobbyPlayerPanel : Panel
 		Profile = data;
 		level.Advisor?.Cancel();
 		if ( level.Advisor != null ) level.Advisor.Enabled = data.Preferences[32] != 0;
+		if ( flow.Result?.Kind == LobbyPlayerChoiceKind.New ) level.Advisor?.Say( 0x189 );
 		PlayerSelected?.Invoke( profile, data );
 	}
 	private void Cancel()
@@ -121,6 +133,7 @@ internal sealed class LobbyPlayerPanel : Panel
 		logo.Draw();
 		foreach ( var player in players ) player.Draw();
 		quit.Draw();
+		failure.Draw();
 		naming.Draw();
 	}
 }
