@@ -77,7 +77,7 @@ public sealed class LobbyModel : Entity
 						textures[i] = texture;
 					}
 				}
-				material.Set( "Color", textures );
+				material.Set( "Color", textures, batch.Wrap ? SamplerType.AnisotropicWrap : SamplerType.Anisotropic );
 
 				var vertices = new Vertex[mesh.Vertices.Length];
 				for ( int i = 0; i < vertices.Length; i++ )

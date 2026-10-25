@@ -85,4 +85,28 @@ public class LobbyGlobeTests
 			foreach ( var material in mesh.Materials ) Assert.IsTrue( new TextureFile( $"lobby/terrain/textures/{material.Name}.wct" ).Data.Width > 0 );
 		}
 	}
+	[TestMethod]
+	public void WorldMaterialBatchesKeepNativeAddressModesWithoutLosingFaces()
+	{
+		GameData.Require();
+		bool clamped = false, wrapped = false;
+		var paths = LobbyConfig.Load().Islands.Select( island => island.ModelPath )
+			.Concat( new[] { "lobby/terrain/Base.md2", "lobby/globe/globe.md2" } );
+		foreach ( string name in paths )
+		{
+			var model = new ModelFile( AnimationFiles.ResolveModel( name ) );
+			foreach ( var mesh in model.Meshes )
+			{
+				var batches = LobbyModelBatches.Create( mesh );
+				CollectionAssert.AreEquivalent( mesh.Indices, batches.SelectMany( batch => batch.Indices ).ToArray(), name );
+				foreach ( var batch in batches )
+				{
+					clamped |= !batch.Wrap; wrapped |= batch.Wrap;
+					foreach ( uint index in batch.Indices )
+						Assert.AreEqual( (mesh.Materials[mesh.Vertices[index].TextureIndex].Flags & 0x30) != 0, batch.Wrap, name );
+				}
+			}
+		}
+		Assert.IsTrue( clamped && wrapped, "The shipped models must exercise both native address modes" );
+	}
 }

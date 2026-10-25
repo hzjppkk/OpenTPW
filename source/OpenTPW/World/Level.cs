@@ -69,7 +69,12 @@ public class Level
 		layout.OnInit();
 		Navigation = new LobbyNavigation( Lobby! );
 		Navigation.IslandSelected += LobbyCameraMode.SelectIsland;
-		Navigation.EntryRequested += LobbyCameraMode.BeginEntering;
+		Navigation.EntryRequested += () =>
+		{
+			// 0x5dcd00 -> 0x4b6a30 plays global lobby effect 4 when leaving island selection.
+			Audio?.Play( "global/sound", "cat_globallobbysfx", 4 );
+			LobbyCameraMode.BeginEntering();
+		};
 		Navigation.EntryCancelled += LobbyCameraMode.CancelEntering;
 		IslandMenu = Hud.AddChild( new LobbyIslandPanel( Navigation ) );
 		GlobeMenu = Hud.AddChild( new LobbyGlobePanel( this ) );
