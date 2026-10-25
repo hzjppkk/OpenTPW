@@ -44,6 +44,8 @@ internal sealed class LobbyIslandPanel : Panel
 		enter.State = State( EnterBox ); globe.State = State( GlobeBox );
 		next.State = State( NextBox ); previous.State = State( PreviousBox );
 		bool Click( Rectangle bounds ) => Input.LeftPressed && LobbyNamingPanel.Hit( bounds );
+		// 0x4b65d0 maps the visual left button (0x1e0f0) to vtable +0x34,
+		// and the visual right button (0x1e0f1) to +0x30: opposite the keyboard handlers.
 		if ( Input.Pressed( Key.Left ) || Click( PreviousBox ) ) { Failure = ""; navigation.Navigate( 1 ); }
 		else if ( Input.Pressed( Key.Right ) || Click( NextBox ) ) { Failure = ""; navigation.Navigate( -1 ); }
 		else if ( Input.Pressed( Key.Enter ) || Click( EnterBox ) ) { Failure = ""; navigation.Enter(); }

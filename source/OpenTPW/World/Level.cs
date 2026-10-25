@@ -20,6 +20,7 @@ public class Level
 	public bool FogEnabled => GlobeMenu?.Active != true;
 	public event Action<LobbyPlayerProfile, LobbyIslandConfig>? ParkEntryRequested;
 	private LobbyPlayerProfile? selectedPlayer;
+	private LobbyKeyParticlePanel? keyEffects;
 
 	public SettingsFile Global { get; private init; }
 
@@ -73,6 +74,7 @@ public class Level
 		{
 			// 0x5dcd00 -> 0x4b6a30 plays global lobby effect 4 when leaving island selection.
 			Audio?.Play( "global/sound", "cat_globallobbysfx", 4 );
+			keyEffects?.EnterIsland();
 			LobbyCameraMode.BeginEntering();
 		};
 		Navigation.EntryCancelled += LobbyCameraMode.CancelEntering;
@@ -102,12 +104,17 @@ public class Level
 			Advisor = new LobbyAdvisor( Audio );
 			Advisor.ResponseCue += response =>
 			{
-				if ( response == 0x189 ) Audio.Play( "global/sound", "cat_globallobbysfx", 0xc6 );
+				if ( response == 0x189 )
+				{
+					Audio.Play( "global/sound", "cat_globallobbysfx", 0xc6 );
+					keyEffects?.IntroductionKey();
+				}
 			};
 			Advisor.Welcome( LobbyPlayerProfiles.Read().Any( player => player != null ) );
 			Hud.AddChild( new LobbyAdvisorPanel( Advisor ) );
 		}
 
+		keyEffects = Hud.AddChild( new LobbyKeyParticlePanel() );
 		Hud.AddChild( new LobbyFadePanel() );
 		Hud.AddChild( new Cursor() );
 	}
