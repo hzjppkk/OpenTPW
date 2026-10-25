@@ -43,7 +43,7 @@ public static class LobbySigns
 			using var wct = new MemoryStream();
 			using ( var writer = new BinaryWriter( wct, Encoding.ASCII, true ) )
 			{
-				writer.Write( (byte)0 ); // SGN backgrounds use the half-scale wavelet layout.
+				writer.Write( (byte)0x12 ); // Embedded BILZ backgrounds use packed row coefficients.
 				writer.Write( (byte)(alphaSize > 0 ? 1 : 0) );
 				writer.Write( (byte)32 ); writer.Write( (byte)1 );
 				writer.Write( (short)width ); writer.Write( (short)height );
