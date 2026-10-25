@@ -24,9 +24,9 @@ public static class GameDir
 			return Path.GetFullPath( configured );
 		}
 
-		return Find( Environment.CurrentDirectory )
+		return Find( Environment.CurrentDirectory ) ?? Find( AppContext.BaseDirectory )
 			?? throw new DirectoryNotFoundException( $"Theme Park World not found from {Environment.CurrentDirectory}: "
-				+ "put the game folder (the one with data/) here or in a folder above, or set GamePath" );
+				+ $"or {AppContext.BaseDirectory}: put the game folder (the one with data/) here or in a folder above, or set GamePath" );
 	}
 
 	/// <summary>

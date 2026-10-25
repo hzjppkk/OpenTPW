@@ -15,6 +15,9 @@ internal static class Game
 		//
 		var gamePath = GameDir.GamePath;
 		Log.Info( $"Game data: {gamePath}" );
+		// Shell launchers can supply their own working directory. Resolve engine assets once
+		// before shaders, icons and the editor cache use relative paths.
+		Directory.SetCurrentDirectory( EngineContent.Find( Environment.CurrentDirectory, AppContext.BaseDirectory ) );
 
 		// Register game data directory
 		FileSystem = new BaseFileSystem( $"{gamePath}/data/" );
