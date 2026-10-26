@@ -20,6 +20,8 @@ public class Level
 	internal LobbyGlobePanel? GlobeMenu { get; private set; }
 	internal LobbyMenuPanel? Menu { get; private set; }
 	public bool FogEnabled => GlobeMenu?.Active != true;
+	/// <summary>Scene lighting: the globe page has its own ambient and light (0x5d8060), every other page the islands' (0x5dc390).</summary>
+	internal LobbyLighting Lighting => GlobeMenu?.Active == true ? LobbyLighting.Globe : LobbyLighting.Islands;
 	/// <summary>Raised when the entry flight completes. No park loader consumes it yet; without a handler the island page is restored.</summary>
 	public event Action<LobbyPlayerProfile, LobbyIslandConfig>? ParkEntryRequested;
 	private LobbyPlayerProfile? selectedPlayer;

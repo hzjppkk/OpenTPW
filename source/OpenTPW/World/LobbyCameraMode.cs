@@ -89,6 +89,7 @@ public sealed class LobbyCameraMode : CameraMode
 			trackedTarget = FromRetail( fixedView.Target );
 			Rotation = Rotation.LookAt( trackedTarget - Position );
 			FieldOfView = fixedView.VerticalFieldOfViewDegrees;
+			Level.Current?.Lighting.Track( Position.GetSystemVector3(), trackedTarget.GetSystemVector3() );
 			if ( !reportedFixedView )
 			{
 				Log.Info( $"Fixed lobby view active: island {fixedView.IslandId}" );
@@ -103,6 +104,8 @@ public sealed class LobbyCameraMode : CameraMode
 		if ( state.GateOpened ) GateAnimationRequested?.Invoke( SelectedIsland, true );
 		if ( state.EntryCompleted ) IslandEntered?.Invoke( SelectedIsland );
 		Rotation = Rotation.LookAt( trackedTarget - Position );
+		// 0x5d3eb0 re-aims the camera's light at the target on every camera update.
+		Level.Current?.Lighting.Track( Position.GetSystemVector3(), trackedTarget.GetSystemVector3() );
 		// Retail's viewport/frustum spans +/-0.5, rather than the modern +/-1 convention: 0x5751e0 builds the
 		// projection and 0x5747c0 post-scales Y by -2 (100 degrees becomes 61.579468 vertical).
 		FieldOfView = (2 * MathF.Atan( 0.5f * MathF.Tan( Config.IslandFovDegrees.DegreesToRadians() * 0.5f ) )).RadiansToDegrees();

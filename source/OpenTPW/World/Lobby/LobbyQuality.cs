@@ -10,6 +10,8 @@ public sealed class LobbyQuality
 	public int TextureQuality { get; }
 	public int SkyLayers { get; }
 	public bool WeatherEnabled { get; }
+	/// <summary>GraphicalOptions.LIGHTING; 0 makes 0x44ce66 set 0x8c52c0 bits 0x1800, and 0x570ca0 then leaves vertices white.</summary>
+	public bool LightingEnabled { get; }
 	public bool UseSmallTextures => TextureQuality <= 1;
 
 	private LobbyQuality( string preset, SettingsFile settings )
@@ -20,6 +22,7 @@ public sealed class LobbyQuality
 		SkyLayers = Read( settings, "GraphicalOptions.SKYQUALITY", 0, 4 );
 		if ( SkyLayers == 3 ) throw new InvalidDataException( "SKYQUALITY must be 0, 1, 2 or 4." );
 		WeatherEnabled = Read( settings, "GameOptions.WEATHER", 0, 1 ) != 0;
+		LightingEnabled = Read( settings, "GraphicalOptions.LIGHTING", 0, 1 ) != 0;
 	}
 
 	/// <summary>Reads the selected preset; the retail initial detail level is medium (0x423170).</summary>

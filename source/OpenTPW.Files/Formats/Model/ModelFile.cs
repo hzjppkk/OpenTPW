@@ -83,7 +83,23 @@ public partial class ModelFile : BaseFormat
 
 		public MaterialData[] Materials { get; set; }
 
+		/// <summary>
+		/// One normal per entry of <see cref="Vertices"/>, in node space. Authored normals from the record's
+		/// +0x64 table when present (TP.exe 0x570ca0 lights with them; a few are zero and get ambient only),
+		/// otherwise smoothed face normals.
+		/// </summary>
 		public Vector3[] Normals { get; set; }
+
+		/// <summary>Node flags; 0x1000000 marks a prelit mesh (0x577000 skips lighting it).</summary>
+		public uint Flags { get; set; }
+
+		/// <summary>
+		/// ARGB colour per entry of <see cref="Vertices"/> for prelit meshes (flag 0x1000000, +0x64 table,
+		/// used directly by 0x57e2d0); null for meshes lit at run time.
+		/// </summary>
+		public uint[]? PrelitColours { get; set; }
+
+		internal uint NormalOffset { get; set; }
 	}
 
 	public class Node
@@ -257,7 +273,8 @@ public partial class ModelFile : BaseFormat
 				ushort faceCount = reader.ReadUInt16();
 				ushort vertexOrderLength = reader.ReadUInt16();
 				uint vertexOffset = reader.ReadUInt32();
-				_ = reader.ReadUInt32();
+				// +0x64: per-vertex normals, or ARGB colours when the node flag 0x1000000 is set.
+				uint normalOffset = reader.ReadUInt32();
 				uint uvOffset = reader.ReadUInt32();
 				uint materialOffset = reader.ReadUInt32();
 				uint faceOffset = reader.ReadUInt32();
@@ -317,7 +334,9 @@ public partial class ModelFile : BaseFormat
 					VertexOrderOffset = vertexOrderOffset,
 					TransformMatrix = transformMatrix,
 					ParentIndex = parentIndex,
-					Materials = materials.ToArray()
+					Materials = materials.ToArray(),
+					Flags = nodeFlags,
+					NormalOffset = normalOffset
 				};
 
 				Meshes.Add( mesh );
@@ -492,8 +511,28 @@ public partial class ModelFile : BaseFormat
 				mesh.Indices = indices.ToArray();
 
 				CalculateNormals( mesh );
+				ReadVertexLighting( reader, mesh );
 			}
 		}
+	}
+
+	/// <summary>
+	/// The +0x64 table holds one entry per vertex-order entry: float3 normals (0x570ca0 steps 12 bytes and
+	/// passes them to 0x5707f0), or u32 colours for prelit meshes.
+	/// </summary>
+	private static void ReadVertexLighting( BinaryReader reader, Mesh mesh )
+	{
+		if ( mesh.NormalOffset == 0 || mesh.VertexOrderLen == 0 ) return;
+		reader.BaseStream.Seek( mesh.NormalOffset, SeekOrigin.Begin );
+		if ( (mesh.Flags & 0x1000000) != 0 )
+		{
+			mesh.PrelitColours = new uint[mesh.VertexOrderLen];
+			for ( int i = 0; i < mesh.PrelitColours.Length; i++ ) mesh.PrelitColours[i] = reader.ReadUInt32();
+			return;
+		}
+		var normals = new Vector3[mesh.VertexOrderLen];
+		for ( int i = 0; i < normals.Length; i++ ) normals[i] = new Vector3( reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle() );
+		mesh.Normals = normals;
 	}
 
 	private void CalculateNormals( Mesh mesh )
