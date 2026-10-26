@@ -85,8 +85,18 @@ public class LobbyAdvisorPlaybackTests
 			Assert.AreEqual( response, advisor.Response );
 			Assert.IsTrue( advisor.Active );
 		}
-		var error = Assert.ThrowsException<InvalidDataException>( () => advisor.Say( 0x257 ) );
-		StringAssert.Contains( error.Message, "missing speech 638" );
+		// 0x257 uses speech 638: present in US data, missing from the TW and CN speech maps.
+		if ( audio.Assets.Category( "global/speech", "cat_speech" ).Sounds.ContainsKey( 638 ) )
+		{
+			advisor.Say( 0x257, true );
+			advisor.Update( 0 );
+			Assert.AreEqual( 0x257, advisor.Response );
+		}
+		else
+		{
+			var error = Assert.ThrowsException<InvalidDataException>( () => advisor.Say( 0x257 ) );
+			StringAssert.Contains( error.Message, "missing speech 638" );
+		}
 	}
 
 	[TestMethod]
