@@ -12,8 +12,8 @@ public class LobbyControlGeometryTests
 	public void ConfirmationFontCoversTheTraditionalChineseQuitMessage()
 	{
 		GameData.Require();
-		var text = new StringFile( "Language/English/UITEXT.str" )[9];
-		var font = new FontFile( $"Language/English/{LobbyFonts.Name( 4 )}.bf4" );
+		var text = new StringFile( GameLanguage.Path( "UITEXT.str" ) )[9];
+		var font = new FontFile( GameLanguage.Path( $"{LobbyFonts.Name( 4 )}.bf4" ) );
 		Assert.IsTrue( text.Contains( '\n' ) );
 		foreach ( char character in text.Where( character => !char.IsWhiteSpace( character ) ) )
 		{

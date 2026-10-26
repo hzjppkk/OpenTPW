@@ -17,7 +17,7 @@ internal class PurpleButton : Panel
 	// font slot 5 (0x483d20), which is TITLEMED.bf4 at 640x480 (the font loader 0x419390 fills
 	// set 1, the set the game uses at that resolution, with resource 0x40d = TITLEMED.bf4 in
 	// residx.dat), and the colour at 0x74fbc8..0x74fbd0 (0xEC, 0xA2, 0x04, alpha 0xFF).
-	private const string FontPath = "Language/English/TITLEMED.bf4";
+	private static string FontPath => GameLanguage.Path( "TITLEMED.bf4" );
 	private const uint LabelColor = 0xECA204FF;
 
 	// The text element draws each label twice (TP.exe 0x48f950): first a shadow with texel

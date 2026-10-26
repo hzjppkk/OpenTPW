@@ -47,6 +47,7 @@ internal static class GameData
 		FileSystem = new BaseFileSystem( data );
 		FileSystem.RegisterArchiveHandler<WadArchive>( ".wad" );
 		FileSystem.RegisterArchiveHandler<SdtArchive>( ".sdt" );
+		GameLanguage.Select( GameLanguage.Resolve( GameLanguage.Available( FileSystem ), null ) );
 	}
 
 	/// <summary>

@@ -22,7 +22,7 @@ internal sealed class LobbyUiText : Panel
 	public int LineHeight => font.LineHeight - font.Top;
 	public LobbyUiText( string text, Rectangle units, string fontName = "GAME7", uint color = 0xffffffff )
 	{
-		font = new FontFile( $"Language/English/{fontName}.bf4" );
+		font = new FontFile( GameLanguage.Path( $"{fontName}.bf4" ) );
 		this.units = units;
 		Text = text;
 		Color = color;

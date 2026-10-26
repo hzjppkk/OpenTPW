@@ -140,7 +140,7 @@ public static class LobbySigns
 			"spa_isle" or "spa_gate" => 368,
 			_ => throw new InvalidDataException( $"Unknown lobby sign model {modelPath}" )
 		};
-		var names = new StringFile( "Language/English/OBJECT_NAMES.str" );
+		var names = new StringFile( GameLanguage.Path( "OBJECT_NAMES.str" ) );
 		return (names[index], names[index + 1]);
 	}
 

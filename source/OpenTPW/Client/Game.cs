@@ -23,6 +23,9 @@ internal static class Game
 		FileSystem = new BaseFileSystem( $"{gamePath}/data/" );
 		FileSystem.RegisterArchiveHandler<WadArchive>( ".wad" );
 		FileSystem.RegisterArchiveHandler<SdtArchive>( ".sdt" );
+		// Before any string table or font is read: they all come from this folder.
+		GameLanguage.Select( GameLanguage.Resolve( GameLanguage.Available( FileSystem ), Settings.Default.Language ) );
+		Log.Info( $"Language: {GameLanguage.Name}" );
 
 		//
 		// Check if the save data directory exists (create if not)

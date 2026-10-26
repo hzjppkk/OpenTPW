@@ -14,7 +14,7 @@ public class StringAndSaveTests
 	{
 		GameData.Require();
 
-		var tables = FileSystem.GetFiles( "Language/English" ).Where( x => x.EndsWith( ".str", StringComparison.OrdinalIgnoreCase ) ).ToList();
+		var tables = FileSystem.GetFiles( $"Language/{GameLanguage.Name}" ).Where( x => x.EndsWith( ".str", StringComparison.OrdinalIgnoreCase ) ).ToList();
 		Assert.IsTrue( tables.Count > 0 );
 
 		var failures = new List<string>();
@@ -41,7 +41,7 @@ public class StringAndSaveTests
 	{
 		GameData.Require();
 
-		var fonts = FileSystem.GetFiles( "Language/English" ).Where( x => x.EndsWith( ".bf4", StringComparison.OrdinalIgnoreCase ) ).ToList();
+		var fonts = FileSystem.GetFiles( $"Language/{GameLanguage.Name}" ).Where( x => x.EndsWith( ".bf4", StringComparison.OrdinalIgnoreCase ) ).ToList();
 
 		// The lobby labels use TITLEMED.bf4
 		Assert.IsTrue( fonts.Any( x => Path.GetFileName( x ).Equals( "TITLEMED.bf4", StringComparison.OrdinalIgnoreCase ) ) );

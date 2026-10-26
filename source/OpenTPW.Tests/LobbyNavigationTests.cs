@@ -61,6 +61,6 @@ public class LobbyNavigationTests
 					Assert.IsTrue( new TextureFile( AnimationFiles.ResolveFile( $"ui/textures/{material.Name}.wct", "Island control texture" ) ).Data.Width > 0 );
 			}
 		}
-		foreach ( string font in new[] { "MENUMED", "GAME6AA" } ) Assert.IsTrue( new FontFile( $"Language/English/{font}.bf4" ).Glyphs.Length > 0 );
+		foreach ( string font in new[] { "MENUMED", "GAME6AA" } ) Assert.IsTrue( new FontFile( GameLanguage.Path( $"{font}.bf4" ) ).Glyphs.Length > 0 );
 	}
 }
