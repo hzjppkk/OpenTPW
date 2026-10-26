@@ -42,6 +42,8 @@ public sealed class LobbyWeather : ModelEntity
 		Model = CreateModel( rainVertices, "raindrop.tga" );
 		boltModel = CreateModel( boltVertices, "lightning.tga" );
 		white = new Texture( [255, 255, 255, 255], 1, 1 );
+		// 0x57b360 draws a white full-screen quad with flags 0x9a1; blend 0xa1 is InverseDestinationColor/Zero,
+		// so the flash inverts one frame rather than fading to white.
 		flashMaterial = new Material( "content/shaders/ui.shader", MaterialFlags.DisableDepth | MaterialFlags.InvertDestination );
 	}
 
@@ -58,11 +60,13 @@ public sealed class LobbyWeather : ModelEntity
 		return RetailTexturePixels.DecodeTga( FileSystem.ReadAllBytes( "/generic/weather/" + name ) );
 	}
 
+	/// <summary>Island anchor used for lightning and rain distance; the origin only when no lobby config was given.</summary>
 	private Vector3 IslandPosition( LobbyIslandConfig island )
 	{
-		if ( config != null && config.CameraPositions.TryGetValue( island.Id, out var point ) )
-			return new( point.X, point.Y, island.Height );
-		return Vector3.Zero;
+		if ( config == null ) return Vector3.Zero;
+		if ( !config.CameraPositions.TryGetValue( island.Id, out var point ) )
+			throw new InvalidDataException( $"Lobby config has no camera position for island {island.Id}." );
+		return new( point.X, point.Y, island.Height );
 	}
 
 	protected override void OnUpdate()

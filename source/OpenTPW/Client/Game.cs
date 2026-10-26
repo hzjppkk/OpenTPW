@@ -46,12 +46,17 @@ internal static class Game
 		//
 		// Create level
 		//
+#if DEBUG
+		// Debug options: --verify-lobby <dir> runs scene transitions through production callbacks
+		// without injecting OS input; --lobby-view <file> pins the camera for retail comparison.
+		var options = DebugOptions( args );
+		LobbyCameraMode.FixedViewPath = options.GetValueOrDefault( "--lobby-view" );
+#endif
 		using var audio = new AudioSystem( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
 		if ( !audio.Available ) Log.Warning( $"Audio output unavailable: {audio.Failure}" );
 		var level = new Level( "jungle", audio );
 #if DEBUG
-		// Run deterministic scene transitions through production callbacks without injecting OS input.
-		LobbyAcceptance? acceptance = args.Length == 2 && args[0] == "--verify-lobby" ? new( level, args[1] ) : null;
+		LobbyAcceptance? acceptance = options.TryGetValue( "--verify-lobby", out var output ) ? new( level, output ) : null;
 #endif
 
 		//
@@ -71,4 +76,17 @@ internal static class Game
 		acceptance?.VerifyCompleted();
 #endif
 	}
+
+#if DEBUG
+	private static Dictionary<string, string> DebugOptions( string[] args )
+	{
+		var options = new Dictionary<string, string>();
+		for ( int i = 0; i < args.Length; i += 2 )
+		{
+			if ( args[i] is not ("--verify-lobby" or "--lobby-view") || i + 1 >= args.Length || !options.TryAdd( args[i], args[i + 1] ) )
+				throw new ArgumentException( $"Expected --verify-lobby <dir> and/or --lobby-view <file>, got: {string.Join( ' ', args )}" );
+		}
+		return options;
+	}
+#endif
 }

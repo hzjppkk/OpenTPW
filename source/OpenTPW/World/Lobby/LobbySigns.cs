@@ -7,7 +7,12 @@ namespace OpenTPW;
 public static class LobbySigns
 {
 	private static readonly Dictionary<string, Texture?> cache = new( StringComparer.OrdinalIgnoreCase );
+	private static bool reportedMissingText;
 
+	/// <summary>
+	/// Returns the generated texture for a model's <c>sign1</c>/<c>sign2</c> material, or null for other
+	/// materials. Text needs Windows GDI/Uniscribe; elsewhere the plain SGN background is used.
+	/// </summary>
 	public static Texture? Resolve( string modelPath, string materialName, string title )
 	{
 		// Only the two generated halves belong to the SGN atlas. Other material names
@@ -22,7 +27,15 @@ public static class LobbySigns
 		using var buffer = new MemoryStream();
 		input.CopyTo( buffer );
 		var lines = LocalizedLines( modelPath );
-		var image = Split( Compose( buffer.ToArray(), lines.First, lines.Second ), materialName.Equals( "sign1", StringComparison.OrdinalIgnoreCase ) ? 0 : 1 );
+		TextureData composed;
+		if ( OperatingSystem.IsWindows() ) composed = Compose( buffer.ToArray(), lines.First, lines.Second );
+		else
+		{
+			if ( !reportedMissingText ) Log.Warning( "Lobby sign text needs Windows GDI and Uniscribe; showing sign backgrounds only" );
+			reportedMissingText = true;
+			composed = DecodeBackground( buffer.ToArray() );
+		}
+		var image = Split( composed, materialName.Equals( "sign1", StringComparison.OrdinalIgnoreCase ) ? 0 : 1 );
 		return cache[key] = new Texture( image.Data, image.Width, image.Height );
 	}
 
@@ -63,10 +76,15 @@ public static class LobbySigns
 		throw new InvalidDataException( "SGN has no supported background image" );
 	}
 
+	/// <summary>
+	/// One SGN text line: font face/file, character spacing in percent, top Y in the 512x512 drawing, the raw LOGFONT,
+	/// and the bevel/lighting parameters used to shade the text.
+	/// </summary>
 	public sealed record SignLine( string Face, string FontPath, int Spacing, int Y, byte[] LogFont,
 		int Bevel, float Depth, float Blur, float Ambient, float Diffuse, float Specular, float Power,
 		float Azimuth, float Elevation, int CachedHeight, int CachedTop );
 
+	/// <summary>Decoded SGN v101: draw order, shadow mode per line, styles, lighting patterns and the embedded background.</summary>
 	public sealed record SignDefinition( int Order, int[] Modes, SignLine[] Lines, byte[][] Styles,
 		TextureData[] Patterns, TextureData Background );
 
@@ -329,6 +347,10 @@ public static class LobbySigns
 		}
 	}
 
+	/// <summary>
+	/// Retail sign text path 0x5e56f0: GDI font from the SGN LOGFONT, Uniscribe layout, white on black at twice the size in
+	/// an 8-bit DIB, then 2x2 averaged to coverage. A line that does not fit is retried with a bisected width.
+	/// </summary>
 	internal static class NativeFont
 	{
 		[StructLayout( LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode )]

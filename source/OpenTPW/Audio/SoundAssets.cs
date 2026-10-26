@@ -9,6 +9,7 @@ public sealed class SoundAssets
 	private readonly Dictionary<string, SoundCategoryMap> categories = new( StringComparer.OrdinalIgnoreCase );
 	private readonly Dictionary<string, SdtArchive> banks = new( StringComparer.OrdinalIgnoreCase );
 	private readonly Dictionary<string, float[]> decoded = new( StringComparer.OrdinalIgnoreCase );
+	private readonly System.Runtime.CompilerServices.ConditionalWeakTable<MP2File, float[]> decodedFiles = new();
 	public SoundCategoryMap Category( string directory, string category )
 	{
 		string key = directory.TrimEnd( '/' ) + "/" + category;
@@ -26,10 +27,16 @@ public sealed class SoundAssets
 		if ( sample.Id == 0 || sample.Id > bank.soundFiles.Count ) throw new InvalidDataException( $"Invalid sample {sample.Id} in {path}" );
 		return bank.soundFiles[(int)sample.Id - 1];
 	}
+	/// <summary>
+	/// Decoded PCM, shared by identical payloads. Cached bank entries hit the reference table;
+	/// files read per call (<see cref="AudioSystem.PlayFile"/>) fall back to a content hash.
+	/// </summary>
 	public float[] Pcm( MP2File file )
 	{
+		if ( decodedFiles.TryGetValue( file, out var known ) ) return known;
 		string key = Convert.ToHexString( System.Security.Cryptography.SHA256.HashData( file.Data ) );
 		if ( !decoded.TryGetValue( key, out var pcm ) ) decoded.Add( key, pcm = Decode( file ) );
+		decodedFiles.AddOrUpdate( file, pcm );
 		return pcm;
 	}
 	public static float[] Decode( MP2File file )

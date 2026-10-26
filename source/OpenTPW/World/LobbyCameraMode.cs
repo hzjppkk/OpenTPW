@@ -2,6 +2,11 @@ using System.Text.Json;
 
 namespace OpenTPW;
 
+/// <summary>
+/// Lobby camera: drives <see cref="LobbyCameraState"/> with retail frame ticks and exposes
+/// island selection, gate and entry events to the lobby. A debug fixed view replaces the
+/// controller for same-viewpoint comparison with the retail game.
+/// </summary>
 public sealed class LobbyCameraMode : CameraMode
 {
 	public static LobbyConfig Config { get; private set; } = null!;
@@ -14,6 +19,12 @@ public sealed class LobbyCameraMode : CameraMode
 	private Vector3 trackedTarget;
 	private static FixedView? fixedView;
 	private bool reportedFixedView;
+	/// <summary>
+	/// Debug-only fixed view file (<c>--lobby-view</c>). Read on <see cref="Configure(LobbyConfig, LobbyRandom, int)"/>;
+	/// null runs the normal controller.
+	/// </summary>
+	internal static string? FixedViewPath { get; set; }
+	/// <summary>Fixed comparison view in retail Y-up coordinates; vertical FOV in degrees.</summary>
 	private sealed record FixedView( int FormatVersion, string CoordinateSystem, int IslandId,
 		float[] Position, float[] Target, float VerticalFieldOfViewDegrees );
 	public static LobbyIslandConfig CurrentIsland => Config.Islands.First( x => x.Id == SelectedIsland );
@@ -36,7 +47,7 @@ public sealed class LobbyCameraMode : CameraMode
 
 	private static FixedView? ReadFixedView()
 	{
-		var path = Environment.GetEnvironmentVariable( "OPENTPW_LOBBY_VIEW" );
+		var path = FixedViewPath;
 		if ( string.IsNullOrWhiteSpace( path ) ) return null;
 		var view = JsonSerializer.Deserialize<FixedView>( File.ReadAllText( path ),
 			new JsonSerializerOptions { PropertyNameCaseInsensitive = true } );
@@ -92,7 +103,8 @@ public sealed class LobbyCameraMode : CameraMode
 		if ( state.GateOpened ) GateAnimationRequested?.Invoke( SelectedIsland, true );
 		if ( state.EntryCompleted ) IslandEntered?.Invoke( SelectedIsland );
 		Rotation = Rotation.LookAt( trackedTarget - Position );
-		// Retail's viewport/frustum spans +/-0.5, rather than the modern +/-1 convention.
+		// Retail's viewport/frustum spans +/-0.5, rather than the modern +/-1 convention: 0x5751e0 builds the
+		// projection and 0x5747c0 post-scales Y by -2 (100 degrees becomes 61.579468 vertical).
 		FieldOfView = (2 * MathF.Atan( 0.5f * MathF.Tan( Config.IslandFovDegrees.DegreesToRadians() * 0.5f ) )).RadiansToDegrees();
 	}
 }
@@ -101,6 +113,7 @@ public sealed class LobbyCameraMode : CameraMode
 /// <summary>TP.exe 0x5dac90, 0x5db430 and 0x5dc1d0, in modern Z-up coordinates.</summary>
 internal sealed class LobbyCameraState
 {
+	/// <summary>Controller phase: free roam, orbit an island, align with its doorway, fly in, done.</summary>
 	internal enum Movement { Roaming, Orbiting, Aligning, Entering, Entered }
 	private readonly LobbyConfig config;
 	private readonly LobbyRandom random;
@@ -109,9 +122,11 @@ internal sealed class LobbyCameraState
 	private float targetSpeed = 2;
 	internal Vector3 Position { get; private set; }
 	internal Vector3 Target { get; private set; }
+	/// <summary>Orbit angle in radians, kept in [0, 2π) as 0x5db430 does.</summary>
 	internal float Angle { get; private set; }
 	internal float Radius { get; private set; }
 	internal float Height { get; private set; }
+	/// <summary>Fade to black during entry: 0 until the flight starts, 1 when the radius reaches 8.</summary>
 	internal float EntryFade { get; private set; }
 	internal int CurrentIslandId { get; private set; }
 	internal Movement Mode { get; private set; } = Movement.Roaming;
@@ -164,6 +179,7 @@ internal sealed class LobbyCameraState
 		return closeGate;
 	}
 
+	/// <summary>Advances the controller by <paramref name="dt"/> retail ticks (1 = 100 ms, clamped to 5).</summary>
 	internal void Update( float dt )
 	{
 		dt = Math.Clamp( dt, 0, 5 );
@@ -254,6 +270,8 @@ internal sealed class LobbyCameraState
 	private static Vector3 Direction( Vector3 delta ) => delta.LengthSquared == 0 ? new Vector3( 1, 0, 0 ) : delta.Normal;
 	private static float Wrap( float angle )
 	{
+		// Repeated subtraction matches retail rounding; a non-finite angle would never terminate.
+		if ( !float.IsFinite( angle ) ) throw new InvalidDataException( $"Lobby camera angle is not finite: {angle}" );
 		while ( angle >= MathF.Tau ) angle -= MathF.Tau;
 		while ( angle < 0 ) angle += MathF.Tau;
 		return angle;

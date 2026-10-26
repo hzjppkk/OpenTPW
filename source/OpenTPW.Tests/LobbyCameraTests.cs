@@ -42,6 +42,12 @@ public class LobbyCameraTests
 		Assert.AreEqual( 70f, state.Radius );
 	}
 	[TestMethod]
+	public void NonFiniteTicksAreRejected()
+	{
+		var state = Create(); state.SelectIsland( 0 );
+		Assert.ThrowsException<System.IO.InvalidDataException>( () => state.Update( float.NaN ) );
+	}
+	[TestMethod]
 	public void SwitchingIslandsPreservesPoseAndAngle()
 	{
 		var state = Create(); state.SelectIsland( 0 ); state.Update( 1 );

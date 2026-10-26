@@ -99,6 +99,19 @@ public class AudioTests
 		FileSystem.ReadAllBytes( $"{directory}/{category}BANK.map" ), FileSystem.ReadAllBytes( $"{directory}/{category}SFX.map" ) );
 
 	[TestMethod]
+	public void PcmIsSharedByFileAndByIdenticalPayload()
+	{
+		GameData.Require();
+		var assets = new SoundAssets();
+		var map = Read( "global/sound", "cat_globallobbysfx" );
+		var file = assets.Sample( "global/sound", map, map.Sounds[1].Definitions[0].Samples[0] );
+		var pcm = assets.Pcm( file );
+		Assert.AreSame( pcm, assets.Pcm( file ) );
+		var copy = new MP2File( file.Header, file.Name, file.SoundData, file.SampleRate, file.BitsPerSample, (int)file.SoundType, file.Samples, file.Data );
+		Assert.AreSame( pcm, assets.Pcm( copy ) );
+	}
+
+	[TestMethod]
 	public void LobbyBanksBindEveryCandidateAndDecodeActualMpeg()
 	{
 		GameData.Require();
