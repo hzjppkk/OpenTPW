@@ -134,7 +134,15 @@ internal sealed class LobbyOptionsPanel : Panel
 		Add( -1, 0x14a7e48b, Box( 1763, 1340, 1846, 1424 ) );
 		interactive = controls.Where( c => c.Handle != null || c.Id is >= 0xc1 and <= 0xc7 || c.Id is 0xd2 or 0xd3 or 0xd7 or 0xd9 or 0xdb or 0xdd or -1 or -2 ).ToArray();
 	}
-	private static string PackLabel( string value ) => "Pack: " + (value.Length == 0 ? "None" : Path.GetFileName( value ));
+	/// <summary>Distinguish equally named installed/CD packs using cached paths, without directory reads in the UI.</summary>
+	private string PackLabel( string value )
+	{
+		if ( value.Length == 0 ) return "Pack: None";
+		string name = Path.GetFileName( value );
+		if ( packs.Count( candidate => Path.GetFileName( candidate ).Equals( name, StringComparison.OrdinalIgnoreCase ) ) > 1 )
+			name = Path.GetFileName( Path.GetDirectoryName( value ) ) + "/" + name;
+		return "Pack: " + name;
+	}
 	internal void Show()
 	{
 		if ( Active || level.Hud.Modal != null ) return;
