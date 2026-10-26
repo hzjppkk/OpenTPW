@@ -53,9 +53,10 @@ internal sealed class LobbyNamingPanel : Panel
 		controls.Add( exit = new LobbyUiModel( "b_exit", Box( 1387, 613, 1470, 696 ) ) );
 		controls.Add( okay = new LobbyUiModel( "b_okay", Box( 1376, 524, 1460, 608 ) ) );
 		// 0x4a48c0 applies 0x490a90 to element 0x709.
-		controls.Add( new LobbyUiText( Localization.Parse( "#EnterName" ), Box( 655, 285, 1315, 365 ), "TITLEMED", 0xeaef66ff ) );
-		controls.Add( instantText = new LobbyUiText( Localization.Parse( "#InstantAction" ), Box( 764, 405, 1206, 476 ) ) );
-		controls.Add( simulationText = new LobbyUiText( Localization.Parse( "#FullSimulation" ), Box( 764, 498, 1206, 569 ) ) );
+		// UI-table text elements of the naming window (0x74fa58), drawn with their shadow.
+		controls.Add( new LobbyUiText( Localization.Parse( "#EnterName" ), Box( 655, 285, 1315, 365 ), "TITLEMED", 0xeaef66ff ) { Shadow = true } );
+		controls.Add( instantText = new LobbyUiText( Localization.Parse( "#InstantAction" ), Box( 764, 405, 1206, 476 ) ) { Shadow = true } );
+		controls.Add( simulationText = new LobbyUiText( Localization.Parse( "#FullSimulation" ), Box( 764, 498, 1206, 569 ) ) { Shadow = true } );
 		name = new LobbyUiText( "", Box( 623, 632, 1186, 677 ) ) { HorizontalAlignment = 0, VerticalAlignment = 0 };
 		error = new LobbyUiText( "", Box( 500, 720, 1516, 830 ) );
 		controls.Add( error );

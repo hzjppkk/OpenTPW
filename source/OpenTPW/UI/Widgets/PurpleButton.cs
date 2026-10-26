@@ -20,11 +20,8 @@ internal class PurpleButton : Panel
 	private static string FontPath => GameLanguage.Path( "TITLEMED.bf4" );
 	private const uint LabelColor = 0xECA204FF;
 
-	// The text element draws each label twice (TP.exe 0x48f950): first a shadow with texel
-	// (0x80, 0x80, 0x80, 0x80), 2 pixels left and 2 down, then the text with (0xFF, 0xFF, 0xFF, 0xFF).
-	// Both are tinted by the label colour.
-	private const int ShadowOffset = 2;
-	private const byte ShadowLevel = 0x80;
+	// Labels are UI-table text elements: drawn with their shadow (LobbyUiText.RenderElement, 0x48f950).
+	private const int ShadowOffset = LobbyUiText.ShadowOffset;
 
 	private readonly List<Model> bars = new();
 	private static LobbyButtonGeometry? geometry;
@@ -48,7 +45,7 @@ internal class PurpleButton : Panel
 		Log.Info( $"Parsed '{text}' as '{Text}'" );
 
 		Font ??= new FontFile( FontPath );
-		var label = RenderLabel( Font, Text );
+		var label = LobbyUiText.RenderElement( Font, Text, LabelColor );
 		Label = new Texture( label.Data, label.Width, label.Height, TextureFlags.PointFilter );
 
 		// Centre the text (not its shadow) in the text box; the shadow hangs off its left and bottom
@@ -99,45 +96,6 @@ internal class PurpleButton : Panel
 				bars.Add( new Model( vertices, indices.ToArray(), material ) );
 			}
 		}
-	}
-
-	/// <summary>
-	/// The label with its shadow, as the text element draws it (see <see cref="ShadowOffset"/>).
-	/// </summary>
-	private static TextureData RenderLabel( FontFile font, string text )
-	{
-		var mask = font.RenderString( text );
-		int width = mask.Width + ShadowOffset, height = mask.Height + ShadowOffset;
-		var data = new byte[width * height * 4];
-
-		void Put( int x, int y, byte level, byte alpha )
-		{
-			int o = (y * width + x) * 4;
-			data[o] = (byte)((LabelColor >> 24) * level / 255);
-			data[o + 1] = (byte)(((LabelColor >> 16) & 0xFF) * level / 255);
-			data[o + 2] = (byte)(((LabelColor >> 8) & 0xFF) * level / 255);
-			data[o + 3] = (byte)((LabelColor & 0xFF) * alpha / 255);
-		}
-
-		for ( int pass = 0; pass < 2; pass++ )
-		{
-			for ( int y = 0; y < mask.Height; y++ )
-			{
-				for ( int x = 0; x < mask.Width; x++ )
-				{
-					var coverage = mask.Data[(y * mask.Width + x) * 4 + 3];
-					if ( coverage == 0 )
-						continue;
-
-					if ( pass == 0 )
-						Put( x, y + ShadowOffset, ShadowLevel, (byte)(ShadowLevel * coverage / 255) );
-					else
-						Put( x + ShadowOffset, y, 255, coverage );
-				}
-			}
-		}
-
-		return new TextureData( width, height, data );
 	}
 
 	protected override void OnRender()
