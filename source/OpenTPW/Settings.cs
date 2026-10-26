@@ -73,13 +73,14 @@ internal sealed class Settings
 	/// <summary>Writes a temporary file and replaces the settings file with it, so a failed write keeps the old one.</summary>
 	public void Save()
 	{
-		var temporary = FilePath + ".tmp";
-		File.WriteAllBytes( temporary, Serialize() );
-		File.Move( temporary, FilePath, true );
+		var temporary = FilePath + "." + Guid.NewGuid().ToString( "N" ) + ".tmp";
+		try
+		{
+			File.WriteAllBytes( temporary, JsonSerializer.SerializeToUtf8Bytes( this, json ) );
+			File.Move( temporary, FilePath, true );
+		}
+		finally { if ( File.Exists( temporary ) ) File.Delete( temporary ); }
 	}
-
-	/// <summary>Serialize with the same strict schema and point representation for multi-file option commits.</summary>
-	internal byte[] Serialize() => JsonSerializer.SerializeToUtf8Bytes( this, json );
 
 	/// <summary>Writes a point as [x, y].</summary>
 	private sealed class PointConverter : JsonConverter<Point>

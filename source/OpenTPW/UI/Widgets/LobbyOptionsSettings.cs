@@ -85,14 +85,13 @@ internal sealed class LobbyOptionsSettings
 		bool published = false;
 		try
 		{
-			File.WriteAllBytes( staging, settings.Serialize() );
 			if ( profilePath != null )
 			{
 				var data = PlayerProfileFile.Read( File.ReadAllBytes( profilePath ) );
 				preferences.CopyTo( data.Preferences, 0 );
 				File.WriteAllBytes( profileStage!, data.Write() );
 			}
-			File.Move( staging, global, true ); published = true;
+			settings.Save(); published = true;
 			if ( profileStage != null ) File.Move( profileStage, profilePath!, true );
 		}
 		catch
