@@ -61,6 +61,7 @@ public partial class ModelFile : BaseFormat
 		/// <summary>
 		/// Texture coordinates as stored. V runs bottom-up relative to the image that
 		/// <see cref="TextureFile"/> decodes, so sample at (u, 1 - v).
+		/// Retail 0x57cb30 uploads ordinary model UVs directly with texture range/offset only.
 		/// </summary>
 		public Vector2[] TexCoords { get; set; }
 

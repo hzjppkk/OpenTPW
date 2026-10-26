@@ -49,12 +49,26 @@ internal static class Game
 		using var audio = new AudioSystem( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
 		if ( !audio.Available ) Log.Warning( $"Audio output unavailable: {audio.Failure}" );
 		var level = new Level( "jungle", audio );
+#if DEBUG
+		// Run deterministic scene transitions through production callbacks without injecting OS input.
+		LobbyAcceptance? acceptance = args.Length == 2 && args[0] == "--verify-lobby" ? new( level, args[1] ) : null;
+#endif
 
 		//
 		// Run game loop
 		//
 		Render.OnUpdate += level.Update;
+#if DEBUG
+		if ( acceptance != null ) Render.OnUpdate += acceptance.Update;
+#endif
 		Render.OnRender += level.Render;
 		Render.Run();
+		Log.Info( "Render loop stopped" );
+		// A closed SDL window does not stop the audio callback. Drain it before reporting completion.
+		audio.Dispose();
+		Log.Info( "Audio output disposed" );
+#if DEBUG
+		acceptance?.VerifyCompleted();
+#endif
 	}
 }

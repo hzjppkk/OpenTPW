@@ -107,10 +107,16 @@ public partial class Texture : Asset
 
 	private void CreateTexture( string debugName, byte[] data, uint width, uint height, TextureFlags flags )
 	{
-		if ( TryGetCachedTexture( debugName, out var cachedTexture ) )
+		if ( TryGetCachedTexture( debugName, flags, out var cachedTexture ) )
 		{
 			NativeTexture = cachedTexture!.NativeTexture;
 			NativeTextureView = cachedTexture!.NativeTextureView;
+			// A wrapper still needs its own metadata, even though the GPU allocation is shared.
+			Path = cachedTexture.Path;
+			Width = cachedTexture.Width;
+			Height = cachedTexture.Height;
+			SamplerType = cachedTexture.SamplerType;
+			cacheFlags = flags;
 
 			return;
 		}
@@ -147,6 +153,7 @@ public partial class Texture : Asset
 		var textureView = Device.ResourceFactory.CreateTextureView( texture );
 
 		Path = debugName;
+		cacheFlags = flags;
 		NativeTexture = texture;
 		NativeTextureView = textureView;
 		Width = width;

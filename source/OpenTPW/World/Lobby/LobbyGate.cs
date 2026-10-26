@@ -9,6 +9,8 @@ public sealed class LobbyGate : Entity
 	private readonly string enteringAnimation;
 	private readonly string leavingAnimation;
 	private readonly LobbyGatePlayback playback;
+	internal bool HasPendingAnimation => playback.HasPendingSegment;
+	internal bool AnimationFinished => model.AnimationFinished;
 
 	internal LobbyGate( Vector3 position, Quaternion rotation, LobbyIslandConfig config, LobbyQuality quality )
 	{
@@ -35,6 +37,7 @@ internal sealed class LobbyGatePlayback
 	private readonly Action<int> play;
 	private bool started;
 	private int? pending;
+	internal bool HasPendingSegment => pending.HasValue;
 
 	internal LobbyGatePlayback( Action<int> play ) => this.play = play;
 

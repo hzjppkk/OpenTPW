@@ -19,6 +19,12 @@
 
 	<ItemGroup>
 		<Content Include="icon.ico" />
+		<!-- Keep the executable directory runnable after every build and publish.
+		     Manual content copies can retain old shaders when new lobby effects are added. -->
+		<Content Include="..\..\content\**\*"
+			Link="content\%(RecursiveDir)%(Filename)%(Extension)"
+			CopyToOutputDirectory="PreserveNewest"
+			CopyToPublishDirectory="PreserveNewest" />
 	</ItemGroup>
 
 	<ItemGroup>

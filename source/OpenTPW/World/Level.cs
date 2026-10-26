@@ -17,6 +17,7 @@ public class Level
 	internal LobbyNavigation? Navigation { get; private set; }
 	internal LobbyIslandPanel? IslandMenu { get; private set; }
 	internal LobbyGlobePanel? GlobeMenu { get; private set; }
+	internal LobbyMenuPanel? Menu { get; private set; }
 	public bool FogEnabled => GlobeMenu?.Active != true;
 	public event Action<LobbyPlayerProfile, LobbyIslandConfig>? ParkEntryRequested;
 	private LobbyPlayerProfile? selectedPlayer;
@@ -87,7 +88,9 @@ public class Level
 			Navigation.Bind( data );
 			IslandMenu.Activate();
 		};
-		var confirmation = Hud.AddChild( new LobbyConfirmPanel( Hud ) );
+		var confirmation = new LobbyConfirmPanel( Hud );
+		Menu = Hud.AddChild( new LobbyMenuPanel( this, confirmation ) );
+		Hud.AddChild( confirmation );
 		PlayerMenu.QuitRequested += () => confirmation.Show( Localization.Parse( "#ConfirmQuit" ), () => Window.Current.SdlWindow.Close() );
 		LobbyCameraMode.IslandEntered += id =>
 		{
@@ -120,9 +123,25 @@ public class Level
 		Hud.AddChild( new Cursor() );
 	}
 
+	internal void ReturnToPlayers()
+	{
+		// 0x489d10 unloads the selected profile (0x5c3740) before reopening 0x4a4010.
+		GlobeMenu?.Hide(); Navigation!.Unbind(); IslandMenu!.Active = false;
+		selectedPlayer = null; PlayerMenu!.Back(); Advisor?.Cancel();
+		LobbyCameraMode.BeginRoaming();
+	}
+	internal void HandleEscape()
+	{
+		// 0x5dee20 first asks the active page to consume Escape. Naming/globe/modals
+		// keep their own cancellation; an entering island consumes it before the shared menu.
+		if ( Hud.Modal != null || GlobeMenu?.Active == true || !(PlayerMenu!.Browsing || Navigation!.Active) ) return;
+		if ( Navigation!.Entering ) Navigation.CancelEntry();
+		else Menu!.Show();
+	}
 	public void Update()
 	{
 		Audio?.Update();
+		if ( Input.Pressed( Veldrid.Key.Escape ) ) HandleEscape();
 		// 0x54a970 updates 0x595d30 and the particle clock outside UI dispatch.
 		// Modal input routing must not freeze speech/lips or the authored particle chain.
 		Advisor?.Update( Time.Now );

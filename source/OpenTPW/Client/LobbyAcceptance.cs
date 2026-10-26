@@ -1,0 +1,142 @@
+#if DEBUG
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using Veldrid;
+
+namespace OpenTPW;
+
+/// <summary>Opt-in scene acceptance using real page, camera, gate and renderer instances.</summary>
+internal sealed class LobbyAcceptance
+{
+	private readonly Level level;
+	private readonly string output;
+	private readonly List<string> checks = new();
+	private readonly double beginning = Time.Now;
+	private double changed = Time.Now;
+	private int stage, visited, opened, closed;
+	private LobbyGate? cancellingGate;
+	private LobbyConfirmPanel Confirmation => level.Hud.Children.OfType<LobbyConfirmPanel>().Single();
+	internal LobbyAcceptance( Level level, string output )
+	{
+		this.level = level;
+		this.output = Path.GetFullPath( output );
+		Directory.CreateDirectory( this.output );
+		LobbyCameraMode.GateAnimationRequested += ( _, entering ) => { if ( entering ) opened++; else closed++; };
+	}
+	private void Next( int value ) { stage = value; changed = Time.Now; }
+	private void Check( bool value, string description )
+	{
+		if ( !value ) throw new InvalidOperationException( $"Lobby acceptance failed: {description}" );
+		checks.Add( description ); Log.Info( $"Lobby acceptance: {description}" );
+	}
+	internal void Update()
+	{
+		if ( Time.Now - beginning > 180 ) throw new TimeoutException( $"Lobby acceptance timed out at stage {stage}" );
+		double elapsed = Time.Now - changed;
+		var navigation = level.Navigation!;
+		switch ( stage )
+		{
+			case 0 when elapsed > 0.5:
+				// Read an existing local profile. Acceptance must never create or overwrite player data.
+				int slot = Array.FindIndex( LobbyPlayerProfiles.Read(), profile => profile != null );
+				if ( slot < 0 ) throw new InvalidOperationException( "Lobby acceptance needs an existing test profile" );
+				level.PlayerMenu!.Select( slot );
+				Check( navigation.Active && level.IslandMenu!.Active, "existing profile opens island page" );
+				Next( 1 ); break;
+			case 1 when elapsed > 3:
+				Capture( $"lobby-{navigation.Island.ThemeName}" );
+				if ( !navigation.CanEnter ) Check( !navigation.Enter(), $"locked {navigation.Island.ThemeName} rejects entry" );
+				navigation.Navigate( 1 );
+				if ( ++visited < 4 ) Next( 1 );
+				else { Check( navigation.Island.Id == level.Lobby!.Islands[0].Id, "four-island navigation wraps" ); Next( 2 ); }
+				break;
+			case 2 when elapsed > 1:
+				Check( navigation.Enter(), "affordable island accepts entry" );
+				Check( navigation.CancelEntry() && opened == 0 && closed == 0 &&
+					LobbyCameraMode.Movement == LobbyCameraState.Movement.Orbiting, "alignment cancellation leaves the gate closed" );
+				Next( 3 ); break;
+			case 3 when elapsed > 1:
+				Check( navigation.Enter(), "entry can restart after cancellation" ); Next( 4 ); break;
+			case 4 when LobbyCameraMode.Movement == LobbyCameraState.Movement.Entering:
+				// Cancel in the update that actually dispatched M1, while its non-looping segment is unfinished.
+				Check( opened == 1 && navigation.CancelEntry() && closed == 1, "opened gate dispatches one close request" );
+				cancellingGate = Entity.All.OfType<LobbyGate>().Single( gate => gate.HasPendingAnimation );
+				Check( cancellingGate.HasPendingAnimation, "M2 queues behind the active M1 segment" );
+				Next( 5 ); break;
+			case 5 when cancellingGate!.AnimationFinished && !cancellingGate.HasPendingAnimation:
+				Check( !navigation.Entering && LobbyCameraMode.EntryFade == 0, "queued closure finishes and clears entry fade" );
+				Capture( "lobby-gate-cancelled" ); level.GlobeMenu!.Show( LobbyGlobeMode.Visit ); Next( 6 ); break;
+			case 6 when elapsed > 1:
+				Check( level.GlobeMenu!.Active, "globe opens offline" ); Capture( "lobby-globe-offline" );
+				level.GlobeMenu.CameraState.ToggleZoom(); level.GlobeMenu.CameraState.Turn( 1, 1 ); Next( 7 ); break;
+			case 7 when elapsed > 1:
+				Check( level.GlobeMenu!.CameraState.Zoomed, "globe zoom toggles" ); Capture( "lobby-globe-zoom" );
+				level.GlobeMenu.Hide(); Next( 8 ); break;
+			case 8 when elapsed > 1:
+				Check( !level.GlobeMenu!.Active && level.IslandMenu!.Active, "globe return restores island page" );
+				Capture( "lobby-globe-return" );
+				level.HandleEscape();
+				Check( level.Menu!.Active && level.Hud.Modal == level.Menu, "orbit Escape opens the shared local menu" );
+				Next( 9 ); break;
+			case 9 when elapsed > 0.5:
+				Capture( "lobby-menu" ); level.Menu!.Choose( UIStrings.QuitGame ); Next( 15 ); break;
+			case 15 when elapsed > 0.5:
+				Capture( "lobby-quit-cancel" ); Confirmation.Close();
+				Check( level.Menu!.Active && level.Hud.Modal == level.Menu, "quit cancellation restores menu input" );
+				level.Menu.Choose( UIStrings.ResumeGame );
+				Check( !level.Menu.Active && level.Hud.Modal == null && navigation.Active, "resume leaves the selected player and island intact" );
+				level.HandleEscape(); level.Menu.Choose( UIStrings.SelectNewPlayer ); Confirmation.Accept();
+				Check( level.PlayerMenu!.Browsing && !navigation.Active && !level.IslandMenu!.Active &&
+					level.Hud.Modal == null, "confirmed new-player selection returns to profiles" );
+				Next( 10 ); break;
+			case 10 when elapsed > 0.5:
+				Capture( "lobby-player" );
+				// An empty slot exercises the real naming dialog without publishing a new profile.
+				int empty = Array.FindIndex( LobbyPlayerProfiles.Read(), profile => profile == null );
+				if ( empty < 0 ) throw new InvalidOperationException( "Naming acceptance needs an empty test slot" );
+				level.PlayerMenu!.Select( empty ); Next( 11 ); break;
+			case 11 when elapsed > 0.5:
+				Capture( "lobby-naming" ); level.PlayerMenu!.Cancel();
+				Check( level.PlayerMenu.Browsing, "naming cancellation returns to profile selection without creating data" ); Next( 12 ); break;
+			case 12 when elapsed > 0.5:
+				level.HandleEscape(); level.Menu!.Choose( UIStrings.QuitGame ); Next( 13 ); break;
+			case 13 when elapsed > 0.5:
+				Capture( "lobby-quit-accept" ); Confirmation.Accept(); Next( 14 ); break;
+		}
+	}
+	internal void VerifyCompleted()
+	{
+		Check( stage == 14 && !Window.Current.SdlWindow.Exists, "confirmed quit closes without rendering another frame" );
+		File.WriteAllText( Path.Join( output, "acceptance.json" ), JsonSerializer.Serialize( new { passed = true,
+			assembly = typeof(LobbyAcceptance).Assembly.ManifestModule.ModuleVersionId,
+			width = Render.ResolveColorTexture.Width, height = Render.ResolveColorTexture.Height, checks },
+			new JsonSerializerOptions { WriteIndented = true } ) );
+		Log.Info( "Lobby acceptance PASS" );
+	}
+	private void Capture( string name )
+	{
+		// Read only the game's resolved render target, never the desktop or another application.
+		var source = Render.ResolveColorTexture;
+		using var staging = Device.ResourceFactory.CreateTexture( TextureDescription.Texture2D( source.Width, source.Height,
+			1, 1, PixelFormat.B8_G8_R8_A8_UNorm, TextureUsage.Staging ) );
+		using var commands = Device.ResourceFactory.CreateCommandList();
+		commands.Begin(); commands.CopyTexture( source, staging ); commands.End();
+		Device.SubmitCommands( commands ); Device.WaitForIdle();
+		var mapped = Device.Map( staging, MapMode.Read );
+		try
+		{
+			int stride = checked((int)source.Width * 4), height = checked((int)source.Height);
+			using var stream = File.Create( Path.Join( output, name + "_opentpw.bmp" ) );
+			using var writer = new BinaryWriter( stream );
+			// A negative DIB height preserves the top-first GPU rows without an extra image flip.
+			writer.Write( (ushort)0x4d42 ); writer.Write( 54 + stride * height ); writer.Write( 0 ); writer.Write( 54 );
+			writer.Write( 40 ); writer.Write( (int)source.Width ); writer.Write( -height );
+			writer.Write( (ushort)1 ); writer.Write( (ushort)32 ); writer.Write( 0 ); writer.Write( stride * height );
+			writer.Write( 0 ); writer.Write( 0 ); writer.Write( 0 ); writer.Write( 0 );
+			var row = new byte[stride];
+			for ( int y = 0; y < height; y++ ) { Marshal.Copy( mapped.Data + checked((int)(y * mapped.RowPitch)), row, 0, stride ); writer.Write( row ); }
+		}
+		finally { Device.Unmap( staging ); }
+	}
+}
+#endif

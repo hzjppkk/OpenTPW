@@ -10,6 +10,7 @@ internal sealed class LobbyConfirmPanel : Panel
 	private readonly LobbyUiModel backdrop, background, cancel, okay;
 	private readonly LobbyUiText message;
 	private Action? confirm;
+	private Panel? previousModal;
 	private ulong activatedFrame;
 	private static readonly Rectangle CancelBox = LobbyNamingPanel.Box( 1387, 610, 1470, 694 ),
 		OkayBox = LobbyNamingPanel.Box( 1379, 522, 1462, 605 );
@@ -25,10 +26,24 @@ internal sealed class LobbyConfirmPanel : Panel
 	}
 	public void Show( string text, Action accepted )
 	{
+		// Ignore the opening click for one frame and give this dialog exclusive input routing.
 		message.Text = text; confirm = accepted; activatedFrame = Input.FrameNumber;
+		previousModal = hud.Modal;
 		hud.Modal = this;
 	}
-	private void Close() { confirm = null; if ( hud.Modal == this ) hud.Modal = null; }
+	internal void Close()
+	{
+		// A confirmation opened by the Escape menu returns input to that menu on cancellation.
+		confirm = null;
+		if ( hud.Modal == this ) hud.Modal = previousModal;
+		previousModal = null;
+	}
+	internal void Accept()
+	{
+		// Capture the action before clearing modal ownership; a callback may destroy this window.
+		var accepted = confirm ?? throw new InvalidOperationException( "No active confirmation" );
+		Close(); accepted();
+	}
 	protected override void OnUpdate()
 	{
 		if ( !Active || activatedFrame == Input.FrameNumber ) return;
@@ -37,7 +52,8 @@ internal sealed class LobbyConfirmPanel : Panel
 		if ( Input.Pressed( Key.Escape ) || Input.LeftPressed && LobbyNamingPanel.Hit( CancelBox ) ) { Close(); return; }
 		if ( Input.Pressed( Key.Enter ) || Input.LeftPressed && LobbyNamingPanel.Hit( OkayBox ) )
 		{
-			var accepted = confirm!; Close(); accepted();
+			// Release modal ownership before running callbacks that may close the game window.
+			Accept();
 		}
 	}
 	protected override void OnRender()

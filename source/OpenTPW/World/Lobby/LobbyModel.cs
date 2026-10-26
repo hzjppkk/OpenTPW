@@ -67,12 +67,22 @@ public sealed class LobbyModel : Entity
 							}
 							catch ( FileNotFoundException ) when ( name.Equals( "signgrab", StringComparison.OrdinalIgnoreCase ) )
 							{
-								// This unresolved retail material has no shipped WCT; retain its visible placeholder.
-								Log.Warning( $"Unimplemented lobby material {name} in {modelPath}: {texturePath}" );
-								texture = Texture.Missing;
+								// 0x572440 -> 0x571ea0 falls back to the cache's default texture.
+								// 0x571060 initializes it from this shipped TGA, not a white pixel.
+								Log.Warning( $"Missing lobby material {name} in {modelPath}: {texturePath}; using retail default" );
+								texturePath = AnimationFiles.ResolveFile( "generic/defaulttexture/NotFound.tga", "Retail default texture" );
 							}
 							if ( texture == null && !TextureCache.TryGetValue( texturePath, out texture ) )
-								TextureCache[texturePath] = texture = new Texture( texturePath, TextureFlags.Repeat );
+							{
+								if ( texturePath.HasExtension( ".wct" ) ) texture = new Texture( texturePath, TextureFlags.Repeat );
+								else
+								{
+									// Game-data TGAs use the virtual filesystem, unlike engine-content image paths.
+									using var stream = FileSystem.OpenRead( texturePath );
+									texture = new Texture( stream, TextureFlags.Repeat );
+								}
+								TextureCache[texturePath] = texture;
+							}
 						}
 						textures[i] = texture;
 					}

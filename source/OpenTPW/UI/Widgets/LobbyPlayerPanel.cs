@@ -39,7 +39,7 @@ internal sealed class LobbyPlayerPanel : Panel
 			players[i] = new PurpleButton( flow.SlotLabel( i ) ?? "#CreateNewPlayer", Pixels( Box( 884, 46 + step, 2048, 193 + step ) ), Pixels( Box( 941, 75 + step, 1716, 164 + step ) ) );
 		}
 	}
-	private void Select( int slot )
+	internal void Select( int slot )
 	{
 		if ( !flow.Select( slot ) ) return;
 		failure.Text = "";
@@ -96,7 +96,7 @@ internal sealed class LobbyPlayerPanel : Panel
 		if ( flow.Result?.Kind == LobbyPlayerChoiceKind.New ) level.Advisor?.Say( 0x189 );
 		PlayerSelected?.Invoke( profile, data );
 	}
-	private void Cancel()
+	internal void Cancel()
 	{
 		flow.Cancel();
 		naming.Active = false;

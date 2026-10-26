@@ -9,6 +9,7 @@ vertex {
     void main() {
         float w = intBitsToFloat(clipDepth);
         gl_Position = vec4(position.xy, position.z * w, w);
+        // RetailTexturePixels supplies bottom-first TGA rows; no additional V flip is needed.
         uv = texCoords;
         tint = vec4(color, float(opacity) / 255.0);
     }

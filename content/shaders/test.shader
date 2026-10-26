@@ -28,6 +28,7 @@ vertex {
 
     void main() {
         vs_out.vTexCoords = texCoords;
+        // Keep MD2 UVs intact on the CPU and pair them with top-first WCT uploads here.
         vs_out.vTexCoords.y = 1.0 - vs_out.vTexCoords.y;
         vs_out.vNormal = mat3(transpose(inverse(g_oUbo.g_mModel))) * normal;
         vs_out.vPosition = vec3(g_oUbo.g_mModel * vec4(position, 1.0));

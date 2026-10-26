@@ -10,6 +10,7 @@ public sealed class LobbyCameraMode : CameraMode
 	internal static event Action<int, bool>? GateAnimationRequested;
 	internal static event Action<int>? IslandEntered;
 	public static float EntryFade => state?.EntryFade ?? 0;
+	internal static LobbyCameraState.Movement Movement => state.Mode;
 	private Vector3 trackedTarget;
 	private static FixedView? fixedView;
 	private bool reportedFixedView;
@@ -150,11 +151,13 @@ internal sealed class LobbyCameraState
 
 	internal void BeginEntering()
 	{
+		// Entry first aligns the orbit with the authored doorway; the gate opens on that transition.
 		if ( Mode == Movement.Orbiting ) Mode = Movement.Aligning;
 	}
 
 	internal bool CancelEntering()
 	{
+		// Cancelling alignment leaves the closed gate alone. Only an opened gate queues M2.
 		bool closeGate = Mode == Movement.Entering || Mode == Movement.Entered;
 		if ( Mode != Movement.Roaming ) Mode = Movement.Orbiting;
 		EntryFade = 0;
@@ -195,6 +198,7 @@ internal sealed class LobbyCameraState
 		}
 		else if ( Mode == Movement.Entering )
 		{
+			// 0x5db430 exponentially reduces radius/height in retail dt units (100 ms).
 			Angle = entranceAngle;
 			Radius -= dt * Radius * 0.07f;
 			Height -= dt * Height * 0.6f;
