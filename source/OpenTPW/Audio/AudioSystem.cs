@@ -8,9 +8,11 @@ public sealed class AudioSystem : IDisposable
 	public SoundMixer Mixer { get; } = new();
 	public SoundAssets Assets { get; } = new();
 	private readonly SoundSelection random;
+	/// <summary>A flag-4 sound that picks its next sample when the current voice ends (0x6bdcd0).</summary>
 	private sealed record Repeating( string Directory, string Category, SoundCategoryMap Map, SoundCategoryMap.Sound Sound,
 		SoundCategoryMap.Definition Definition, int SampleIndex, long Voice );
 	private readonly Dictionary<long, Repeating> repeating = new();
+	/// <summary>The voice's own random gain, kept so channel volume changes can be reapplied.</summary>
 	private sealed record ChannelGain( string Category, float Gain );
 	private readonly Dictionary<long, ChannelGain> gains = new();
 	private readonly SettingsFile settings = new( "sound.sam" );
@@ -42,6 +44,7 @@ public sealed class AudioSystem : IDisposable
 		}
 	}
 
+	/// <summary>Plays a category sound (0x5187a0). Returns 0 when output is unavailable or the draw selects no sample.</summary>
 	public long Play( string directory, string category, uint id )
 	{
 		ObjectDisposedException.ThrowIf( disposed, this );
@@ -57,6 +60,7 @@ public sealed class AudioSystem : IDisposable
 		bool directLoop = (sound.Flags & 8) != 0 || ((sound.Flags & 6) == 6 && sound.Definitions.Count == 1 &&
 			definition.Samples.Count == 1 && definition.Relations.Count == 0 && definition.DelayMin == 0 && definition.DelayMax == 0);
 		float gain = random.Range( definition.VolumeMin, definition.VolumeMax ) / 100f;
+		// 0x6b5b00 scores a voice as (priority << 16) plus a distance weight; lobby sounds have no position, so 0xffff.
 		long handle = Mixer.Play( Assets.Pcm( asset ), gain * ChannelVolume( category ),
 			directLoop, random.Range( definition.DelayMin, definition.DelayMax ), unchecked((sound.Priority << 16) + 0xffff) );
 		gains.Add( handle, new( category, gain ) );
@@ -121,6 +125,7 @@ public sealed class AudioSystem : IDisposable
 	private float ChannelVolume( string category ) => channelVolumes[category.EndsWith( "music", StringComparison.OrdinalIgnoreCase ) ? 1 :
 		category.Equals( "cat_speech", StringComparison.OrdinalIgnoreCase ) ? 2 : 0];
 
+	/// <summary>Plays a standalone sound file outside the category tables at <paramref name="volume"/>; channel volumes do not apply.</summary>
 	public long PlayFile( string path, float volume = 1 )
 	{
 		ObjectDisposedException.ThrowIf( disposed, this );

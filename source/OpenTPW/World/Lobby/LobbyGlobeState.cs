@@ -2,6 +2,7 @@ using N = System.Numerics;
 
 namespace OpenTPW;
 
+/// <summary>Globe page A (visit parks with players) or B (select a park with room).</summary>
 public enum LobbyGlobeMode { Visit, Select }
 
 /// <summary>The fields read from a city object by 0x5d7460 and the A/B predicates.</summary>

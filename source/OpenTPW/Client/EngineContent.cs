@@ -1,5 +1,6 @@
 namespace OpenTPW;
 
+/// <summary>Locates the engine's own <c>content</c> directory (shaders, icons), not the retail game data.</summary>
 internal static class EngineContent
 {
 	internal static string Find( string workingDirectory, string executableDirectory )

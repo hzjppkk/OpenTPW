@@ -1,5 +1,6 @@
 namespace OpenTPW;
 
+/// <summary>Player page state; see the members.</summary>
 public enum LobbyPlayerFlowState
 {
 	/// <summary>The four slot buttons are active and nothing is open.</summary>
@@ -12,6 +13,7 @@ public enum LobbyPlayerFlowState
 	Committed
 }
 
+/// <summary>Whether the committed slot loads an existing profile or creates one.</summary>
 public enum LobbyPlayerChoiceKind
 {
 	None,

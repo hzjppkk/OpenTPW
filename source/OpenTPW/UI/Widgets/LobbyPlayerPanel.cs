@@ -3,6 +3,10 @@ using Veldrid;
 
 namespace OpenTPW;
 
+/// <summary>
+/// Player page: four slot buttons, Quit and the naming dialog, driving <see cref="LobbyPlayerFlow"/> and <see cref="LobbyPlayerStore"/>.
+/// Rectangles are the retail UI table values (0x74f770) in 2048x1536 units.
+/// </summary>
 internal sealed class LobbyPlayerPanel : Panel
 {
 	private readonly LobbyPlayerStore store;
@@ -14,6 +18,7 @@ internal sealed class LobbyPlayerPanel : Panel
 	private readonly LobbyNamingPanel naming;
 	private readonly LobbyUiText failure = new( "", LobbyNamingPanel.Box( 500, 1100, 2000, 1250 ) );
 	private int focused;
+	/// <summary>Raised after the profile was read or created on disk; the island page takes over.</summary>
 	public event Action<LobbyPlayerProfile, PlayerProfileFile>? PlayerSelected;
 	public event Action? QuitRequested;
 	public bool Browsing => flow.State == LobbyPlayerFlowState.Browsing;

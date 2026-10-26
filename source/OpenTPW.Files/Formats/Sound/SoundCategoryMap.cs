@@ -6,11 +6,14 @@ namespace OpenTPW;
 /// <summary>TP.exe 0x6ba210..0x6ba6e5: packed category tables, before pointer relocation.</summary>
 public sealed class SoundCategoryMap
 {
+	/// <summary>SDT sample reference; <c>Bank</c> and <c>Id</c> are 1-based (0x6ba5f1), 0 means unbound.</summary>
 	public sealed record Sample( uint Id, uint Threshold, uint DurationMilliseconds, ushort Bank, ushort Flags );
 	public sealed record Relation( uint Definition, uint Parameters );
 	public sealed record Definition( uint Weight, byte VolumeMin, byte VolumeMax, ushort DelayMin, ushort DelayMax,
 		IReadOnlyList<Sample> Samples, IReadOnlyList<Relation> Relations, byte[] Raw );
+	/// <summary>A sound ID's definitions; <c>Priority</c> becomes the high 16 bits of the voice priority (0x6b5b00).</summary>
 	public sealed record Sound( uint Id, uint Priority, ushort Flags, IReadOnlyList<Definition> Definitions );
+	/// <summary>A BANK.map entry: SDT path stem relative to the category's parent directory.</summary>
 	public sealed record Bank( string Path, byte[] Raw );
 
 	public IReadOnlyList<Bank> Banks { get; }
@@ -22,6 +25,7 @@ public sealed class SoundCategoryMap
 		Sounds = new System.Collections.ObjectModel.ReadOnlyDictionary<uint, Sound>( sounds );
 	}
 
+	/// <summary>Bounds-checked cursor; every table is taken in file order before pointers are resolved.</summary>
 	private sealed class Reader
 	{
 		internal readonly byte[] Data;

@@ -13,6 +13,7 @@ public sealed class LobbyNavigation
 	public bool Entering { get; private set; }
 	public LobbyIslandConfig Island => config.Islands[index];
 	public int Keys => profile == null ? 0 : LobbyPlayerProgress.KeyCount( profile, config.Islands.Select( island => island.ThemeName ) );
+	/// <summary>Keys needed to enter the current island: <c>Keys.CostToEnter</c> from the theme's global.sam (1..5).</summary>
 	public int RequiredKeys => costs[Island.Id];
 	public bool CanEnter => Active && !Entering && Keys >= RequiredKeys;
 	public event Action<int>? IslandSelected;
@@ -37,6 +38,7 @@ public sealed class LobbyNavigation
 		index = 0;
 		IslandSelected?.Invoke( Island.Id );
 	}
+	/// <summary>Moves to the previous (-1, 0x5dc6e0) or next (+1, 0x5dc5f0) island, wrapping at both ends.</summary>
 	public void Navigate( int direction )
 	{
 		if ( !Active || Entering ) return;
@@ -44,6 +46,7 @@ public sealed class LobbyNavigation
 		index = ((index + direction) % config.Islands.Count + config.Islands.Count) % config.Islands.Count;
 		IslandSelected?.Invoke( Island.Id );
 	}
+	/// <summary>Starts the entry flight when enough keys are held; the gate opens once the camera is aligned.</summary>
 	public bool Enter()
 	{
 		// Lock selection before notifying the camera so repeated input cannot queue two entries.
@@ -52,6 +55,7 @@ public sealed class LobbyNavigation
 		EntryRequested?.Invoke();
 		return true;
 	}
+	/// <summary>Cancels an entry in progress; the camera decides whether the opened gate closes (M2).</summary>
 	public bool CancelEntry()
 	{
 		if ( !Entering ) return false;

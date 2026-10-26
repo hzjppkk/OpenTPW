@@ -2,6 +2,10 @@ using OpenTPW.UI;
 
 namespace OpenTPW;
 
+/// <summary>
+/// BF4 text in a retail 2048x1536 control rectangle (3.2 units per 640x480 pixel), clipped to that rectangle.
+/// Alignment 0/1/2 = start/centre/end, as passed to 0x656a78.
+/// </summary>
 internal sealed class LobbyUiText : Panel
 {
 	private readonly FontFile font;
@@ -12,6 +16,7 @@ internal sealed class LobbyUiText : Panel
 	public Vector2 Offset { get; set; }
 	public int HorizontalAlignment { get; set; } = 1;
 	public int VerticalAlignment { get; set; } = 1;
+	/// <summary>Horizontal scroll in 640x480 pixels, used by the name box to keep the caret visible.</summary>
 	public float Scroll { get; set; }
 	public float Measure( string text ) => font.MeasureString( text );
 	public int LineHeight => font.LineHeight - font.Top;

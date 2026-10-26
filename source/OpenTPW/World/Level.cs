@@ -2,6 +2,7 @@
 
 namespace OpenTPW;
 
+/// <summary>The running scene. Currently always the lobby: Base, sky, weather, islands, flocks, the HUD pages and their wiring.</summary>
 public class Level
 {
 	internal static Level Current { get; set; }
@@ -19,6 +20,7 @@ public class Level
 	internal LobbyGlobePanel? GlobeMenu { get; private set; }
 	internal LobbyMenuPanel? Menu { get; private set; }
 	public bool FogEnabled => GlobeMenu?.Active != true;
+	/// <summary>Raised when the entry flight completes. No park loader consumes it yet; without a handler the island page is restored.</summary>
 	public event Action<LobbyPlayerProfile, LobbyIslandConfig>? ParkEntryRequested;
 	private LobbyPlayerProfile? selectedPlayer;
 	private LobbyKeyParticlePanel? keyEffects;
@@ -45,6 +47,8 @@ public class Level
 		var sky = new Sky();
 		EnvironmentSky = sky;
 		Lobby = LobbyConfig.Load();
+		// 0x5d07a0 seeds the lobby stream (lobby +0x34) from the clock in seconds; the camera,
+		// weather and island flocks all draw from it, so their construction order matters.
 		var lobbyRandom = new LobbyRandom( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
 		LobbyCameraMode.Configure( Lobby, lobbyRandom );
 		_ = new LobbyWeather( sky, () => LobbyCameraMode.CurrentIsland, Lobby, lobbyRandom, Audio );

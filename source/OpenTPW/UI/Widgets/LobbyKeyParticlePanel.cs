@@ -3,6 +3,7 @@ using System.Globalization;
 
 namespace OpenTPW;
 
+/// <summary>Draws <see cref="LobbyKeyParticles"/> with the SPR_PA sprite atlas. Density comes from the quality preset's PARTICLEDENSITY.</summary>
 internal sealed class LobbyKeyParticlePanel : Panel
 {
 	private readonly LobbyKeyParticles state;

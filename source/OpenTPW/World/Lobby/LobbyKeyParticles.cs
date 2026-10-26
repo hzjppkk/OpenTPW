@@ -5,6 +5,7 @@ namespace OpenTPW;
 /// <summary>Screen-space key effects from 0x595d30, 0x4b6a30 and 0x4b6b50.</summary>
 internal sealed class LobbyKeyParticles
 {
+	/// <summary>Screen-space particle state in retail integer units, updated by 0x51cc80/0x51dbc0.</summary>
 	internal sealed class Particle
 	{
 		internal int X, Y, Z, Vx, Vy, Vz, Life, InitialLife;
@@ -14,6 +15,7 @@ internal sealed class LobbyKeyParticles
 		internal int Sequence, Frame;
 		internal bool New = true;
 	}
+	/// <summary>Running emitter: its raw Tp2.plb record (read at retail offsets), lives, birth countdown and the four phase rates.</summary>
 	private sealed class Emitter
 	{
 		internal byte[] Data = null!;
@@ -23,6 +25,7 @@ internal sealed class LobbyKeyParticles
 		internal int Int( int offset ) => BinaryPrimitives.ReadInt32LittleEndian( Data.AsSpan( offset, 4 ) );
 		internal short Short( int offset ) => BinaryPrimitives.ReadInt16LittleEndian( Data.AsSpan( offset, 2 ) );
 	}
+	/// <summary>Point force from the PLB influencer table; when its life ends it starts <c>Child</c> (-1 for none) at its position.</summary>
 	private sealed record Influencer( int X, int Y, int Z, int Force, int Child ) { internal int Life; }
 	private readonly byte[] library;
 	private readonly int density;

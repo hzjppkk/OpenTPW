@@ -7,10 +7,14 @@ public static partial class Input
 {
 	public static MouseInfo Mouse { get; internal set; } = new();
 	public static KeyboardInfo Keyboard { get; internal set; } = new();
+	/// <summary>Characters typed since the last frame, separate from key events.</summary>
 	public static string Text { get; private set; } = "";
+	/// <summary>Left button went down since the last frame, including a press released within the same frame.</summary>
 	public static bool LeftPressed { get; private set; }
+	/// <summary>Input frame counter; pages use it to ignore the click that opened them.</summary>
 	public static ulong FrameNumber { get; private set; }
 	private static HashSet<Key> pressedKeys = new();
+	/// <summary>Key went down since the last frame (key-down events, not polled state).</summary>
 	public static bool Pressed( Key key ) => pressedKeys.Contains( key );
 
 	public static float Forward { get; set; }

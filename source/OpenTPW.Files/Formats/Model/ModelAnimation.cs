@@ -13,7 +13,7 @@ namespace OpenTPW;
 public class ModelAnimation : BaseFormat
 {
 	/// <summary>
-	/// Frames per second at playback speed 1.
+	/// Frames per second at playback speed 1: 0x470f20 uses (now - start) ms x speed x 0.03.
 	/// </summary>
 	public const float FramesPerSecond = 30f;
 

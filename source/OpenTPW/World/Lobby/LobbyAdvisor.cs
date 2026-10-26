@@ -17,6 +17,7 @@ public sealed class LobbyAdvisor
 	private readonly AudioSystem audio;
 	private readonly Func<int> nextRandom;
 	private readonly Queue<int> queue = new();
+	/// <summary>A response's speech sample, its length in milliseconds and its lip boundary data, resolved once.</summary>
 	private sealed record Prepared( uint Sample, int Duration, byte[] Lips );
 	private readonly Dictionary<int, Prepared> prepared = new();
 	private readonly ModelAnimation[] animations;

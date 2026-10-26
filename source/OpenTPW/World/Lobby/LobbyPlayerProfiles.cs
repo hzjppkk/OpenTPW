@@ -1,5 +1,6 @@
 namespace OpenTPW;
 
+/// <summary>An occupied slot: <c>Directory</c> is <c>users/&lt;slot+1&gt;&lt;Name&gt;</c> in the save filesystem.</summary>
 public sealed record LobbyPlayerProfile( int Slot, string Name, string Directory );
 
 /// <summary>The four login slots enumerated by TP.exe 0x5c2680.</summary>

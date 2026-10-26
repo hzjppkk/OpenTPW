@@ -18,6 +18,10 @@ public sealed class SoundMixer : ISampleProvider
 	private readonly Dictionary<long, Voice> voices = new();
 	private long nextHandle;
 	private int voiceLimit = 30;
+	/// <summary>
+	/// Audible voices allowed by the sound quality preset (<see cref="SoundChannelPolicy"/>), 1..30. Retail caps
+	/// output candidates at 30 (0x6b0fc0/0x6b1130); its logical instance pool (0x6b1890) only grows in steps of 100.
+	/// </summary>
 	public int VoiceLimit
 	{
 		get { lock ( sync ) return voiceLimit; }
@@ -30,6 +34,10 @@ public sealed class SoundMixer : ISampleProvider
 	{
 		WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat( sampleRate, channels );
 	}
+	/// <summary>
+	/// Queues interleaved PCM and returns a non-zero handle. Higher <paramref name="priority"/> wins when voices exceed
+	/// <see cref="VoiceLimit"/>; lower-ranked voices are silent but keep advancing.
+	/// </summary>
 	public long Play( float[] samples, float volume = 1, bool loop = false, int delayMilliseconds = 0, uint priority = 0xffff )
 	{
 		if ( samples.Length == 0 || samples.Length % WaveFormat.Channels != 0 ) throw new ArgumentException( "Audio must contain complete frames", nameof(samples) );

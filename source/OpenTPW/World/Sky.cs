@@ -2,13 +2,18 @@ using StbImageSharp;
 
 namespace OpenTPW;
 
-/// <summary>The lobby loads the fantasy cloud dome and horizon for every island.</summary>
+/// <summary>
+/// Lobby sky. 0x5d3c20 -> 0x581820 always loads the fantasy sky.tga/sky_rgb.tga/sky_cyl.tga, for every island.
+/// SKYQUALITY 0/1/2/4 is the cloud layer count (0x44cc60 -> 0x581c80); 0 draws neither clouds nor horizon.
+/// </summary>
 public class Sky : ModelEntity
 {
 	private sealed class SkyPart : ModelEntity
 	{
 		public SkyPart() => Layer = RenderLayer.Background;
 	}
+	// 0x5d3c20 sets the global background/fog colour 0x8c5b74 to 0xff44ddff. Island changes never alter it;
+	// SKYCOLOUR only recolours the first cloud layer.
 	private static readonly Vector3 Background = new( 68 / 255f, 221 / 255f, 1 );
 	private Texture? colorTexture;
 	private Vector3 color = Background;

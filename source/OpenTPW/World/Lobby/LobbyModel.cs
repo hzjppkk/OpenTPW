@@ -10,6 +10,7 @@ public sealed class LobbyModel : Entity
 	private static readonly Dictionary<string, Texture> TextureCache = new( StringComparer.OrdinalIgnoreCase );
 	private static Texture? whiteTexture;
 	private static Shader? sharedShader;
+	/// <summary>One MD2 mesh with its baked world transform; <c>Animated</c> marks meshes re-baked every frame.</summary>
 	private sealed class Part
 	{
 		public int MeshIndex;
