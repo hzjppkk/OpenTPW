@@ -23,8 +23,17 @@ internal static class Game
 		FileSystem = new BaseFileSystem( $"{gamePath}/data/" );
 		FileSystem.RegisterArchiveHandler<WadArchive>( ".wad" );
 		FileSystem.RegisterArchiveHandler<SdtArchive>( ".sdt" );
+		// A language pack's data is searched before the game's, as if copied over it (retail install step).
+		string[]? packLanguages = null;
+		if ( !string.IsNullOrWhiteSpace( Settings.Default.LanguagePack ) )
+		{
+			var packData = GameLanguage.PackDataFolder( Settings.Default.LanguagePack );
+			FileSystem.AddOverlay( packData );
+			packLanguages = GameLanguage.PackLanguages( packData );
+			Log.Info( $"Language pack: {packData}" );
+		}
 		// Before any string table or font is read: they all come from this folder.
-		GameLanguage.Select( GameLanguage.Resolve( GameLanguage.Available( FileSystem ), Settings.Default.Language ) );
+		GameLanguage.Select( GameLanguage.Resolve( GameLanguage.Available( FileSystem ), Settings.Default.Language, packLanguages ) );
 		Log.Info( $"Language: {GameLanguage.Name}" );
 
 		//
