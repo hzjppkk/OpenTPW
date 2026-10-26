@@ -14,7 +14,7 @@ internal sealed class LobbyAdvisorPanel : Panel
 	{
 		this.advisor = advisor;
 		string[] names = [ "mouth - normal", "mouth - aah", "mouth - eee", "mouth - ooh", "mouth - sss" ];
-		var shader = new Shader( "content/shaders/ui.shader" );
+		var shader = new Shader( "content/shaders/ui-lit.shader" );
 		var textures = new Dictionary<string, Texture>( StringComparer.OrdinalIgnoreCase );
 		var model = advisor.Geometry.Model;
 		for ( int i = 0; i < names.Length; i++ )
@@ -53,6 +53,9 @@ internal sealed class LobbyAdvisorPanel : Panel
 	{
 		if ( !advisor.Active ) return;
 		var pose = advisor.Geometry.Pose( advisor.Animation, advisor.Frame );
+		// LIGHTING=0 leaves vertices white like the scene models (0x44ce66).
+		bool lit = LobbyQuality.Load().LightingEnabled;
+		var ambient = (Level.Current?.Lighting ?? LobbyLighting.Islands).Ambient;
 		foreach ( var part in parts )
 		{
 			// Mouth meshes are selected by LIP state; all other nodes follow segment hiding.
@@ -63,7 +66,9 @@ internal sealed class LobbyAdvisorPanel : Panel
 			{
 				var source = pose.Positions[index]?[i] ?? mesh.Vertices[i].Position;
 				var point = System.Numerics.Vector3.Transform( source.GetSystemVector3(), pose.WorldTransforms[index] );
-				part.Vertices[i] = new Vertex( LobbyAdvisorGeometry.Project( point ), pose.TexCoords[index]?[i] ?? mesh.TexCoords[i] );
+				var colour = lit ? LobbyAdvisorGeometry.Colour( ambient, pose.WorldTransforms[index], mesh.Normals[i].GetSystemVector3() ) : System.Numerics.Vector3.One;
+				part.Vertices[i] = new Vertex( LobbyAdvisorGeometry.Project( point ), pose.TexCoords[index]?[i] ?? mesh.TexCoords[i] )
+					{ Normal = new Vector3( colour.X, colour.Y, colour.Z ) };
 			}
 			part.Model.UpdateVertices( part.Vertices );
 			part.Model.Draw();

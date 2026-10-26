@@ -1,4 +1,4 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
 using System.Linq;
@@ -145,5 +145,15 @@ public class LobbyAdvisorPlaybackTests
 		var pcm = new float[44100];
 		audio.Mixer.Read( pcm, 0, pcm.Length );
 		Assert.IsTrue( pcm.Any( value => Math.Abs( value ) > 0.00001f ), "The cue must decode to audible PCM" );
+	}
+
+	[TestMethod]
+	public void AdvisorOwnLightBrightensFacesTowardsTheViewer()
+	{
+		var ambient = new System.Numerics.Vector3( 0x44 / 255f );
+		var node = System.Numerics.Matrix4x4.CreateScale( 0.01125f, 0.001f, 0.015f );
+		// The light travels into the screen (+Z), so a normal pointing out of it (−Z) is fully lit.
+		Assert.AreEqual( System.Numerics.Vector3.One, LobbyAdvisorGeometry.Colour( ambient, node, -System.Numerics.Vector3.UnitZ ) );
+		Assert.AreEqual( ambient, LobbyAdvisorGeometry.Colour( ambient, node, System.Numerics.Vector3.UnitZ ) );
 	}
 }
