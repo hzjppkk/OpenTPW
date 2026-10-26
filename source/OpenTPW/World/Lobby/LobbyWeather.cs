@@ -153,7 +153,8 @@ public sealed class LobbyWeather : ModelEntity
 			var local = rain.Point( i, Camera.Position );
 			var a = Project( Camera.Position + local );
 			if ( a.W <= 0 ) continue;
-			var b = Project( Camera.Position + local - new Vector3( 0, 0, 0.1f ) );
+			// 0x57b5e0 uses the same final wind vector for the 0.1-unit head and cube motion.
+			var b = Project( Camera.Position + local + LobbyRainSimulation.Direction * 0.1f );
 			float brightness = Math.Max( 0, (int)((6 - a.W) * 12) ) * 3 / 255f;
 			RainQuad( rainVertices, ref rainOffset, a, b, brightness );
 		}

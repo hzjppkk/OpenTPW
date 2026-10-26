@@ -100,7 +100,12 @@ public class LobbyWeatherTests
 		Assert.AreEqual( 3072, draws );
 		Assert.AreEqual( new Vector3( 0, 2, 1 ), rain.Point( 0, Vector3.Zero ) );
 		rain.Advance( 0.2f );
-		Assert.AreEqual( new Vector3( 0, 2, 0 ), rain.Point( 0, Vector3.Zero ) );
+		// 0x579f30's last stores, not its first normalization: layer-3 residual wind.
+		var moved = rain.Point( 0, Vector3.Zero );
+		Assert.AreEqual( -0.00010195f, moved.X, 0.00000001f );
+		Assert.AreEqual( 2.0000052f, moved.Y, 0.0000003f );
+		Assert.AreEqual( 0f, moved.Z );
+		Assert.AreEqual( -1f, LobbyRainSimulation.Direction.Z );
 		Assert.AreEqual( -4f, LobbyRainSimulation.CameraOffset( 40 ) );
 		Assert.AreEqual( -3f, LobbyRainSimulation.Wrap( 5 ) );
 		Assert.AreEqual( 3f, LobbyRainSimulation.Wrap( -5 ) );
