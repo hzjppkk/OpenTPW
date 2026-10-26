@@ -47,6 +47,8 @@ public class AudioTests
 		GameData.Require();
 		using var audio = new AudioSystem( 123, false );
 		long handle = audio.Play( "levels/jungle/Sound", "cat_locallobbysfx", 2 );
+		// First plays decode in the background.
+		Assert.IsTrue( System.Threading.SpinWait.SpinUntil( () => !audio.Mixer.IsPending( handle ), 10000 ) );
 		var output = new float[8820];
 		audio.Mixer.Read( output, 0, output.Length );
 		Assert.IsTrue( output.Any( value => value != 0 ) );
@@ -97,6 +99,36 @@ public class AudioTests
 	}
 	private static SoundCategoryMap Read( string directory, string category ) => SoundCategoryMap.Parse(
 		FileSystem.ReadAllBytes( $"{directory}/{category}BANK.map" ), FileSystem.ReadAllBytes( $"{directory}/{category}SFX.map" ) );
+
+	[TestMethod]
+	public void PendingVoicePlaysOnlyAfterItsPcmArrives()
+	{
+		var mixer = new SoundMixer( 1000, 2 );
+		var source = new System.Threading.Tasks.TaskCompletionSource<float[]>();
+		long handle = mixer.Play( source.Task );
+		var buffer = new float[4];
+		mixer.Read( buffer, 0, buffer.Length );
+		Assert.IsTrue( mixer.IsPlaying( handle ) );
+		CollectionAssert.AreEqual( new float[4], buffer );
+		source.SetResult( new[] { 0.5f, 0.25f } );
+		System.Threading.SpinWait.SpinUntil( () => { mixer.Read( buffer, 0, 2 ); return buffer[0] != 0; }, 1000 );
+		Assert.AreEqual( 0.5f, buffer[0] ); Assert.AreEqual( 0.25f, buffer[1] );
+		mixer.Read( buffer, 0, 2 );
+		Assert.IsFalse( mixer.IsPlaying( handle ) );
+	}
+
+	[TestMethod]
+	public void FailedBackgroundDecodeIsReportedOnTheCallerThread()
+	{
+		var mixer = new SoundMixer( 1000, 2 );
+		var source = new System.Threading.Tasks.TaskCompletionSource<float[]>();
+		long handle = mixer.Play( source.Task );
+		source.SetException( new InvalidDataException( "bad sample" ) );
+		System.Threading.SpinWait.SpinUntil( () => !mixer.IsPlaying( handle ), 1000 );
+		Assert.IsFalse( mixer.IsPlaying( handle ) );
+		Assert.ThrowsException<InvalidDataException>( mixer.ThrowIfFailed );
+		mixer.ThrowIfFailed();
+	}
 
 	[TestMethod]
 	public void PcmIsSharedByFileAndByIdenticalPayload()

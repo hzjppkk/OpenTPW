@@ -13,6 +13,7 @@ public class Model : Asset
 
 	private uint indexCount;
 	private uint vertexCount;
+	private bool dynamicVertices;
 
 	public Model( Vertex[] vertices, uint[] indices, Material material )
 	{
@@ -66,7 +67,18 @@ public class Model : Asset
 	/// </summary>
 	public void UpdateVertices( Vertex[] vertices )
 	{
-		Device.UpdateBuffer( VertexBuffer, 0, vertices );
+		Render.BufferUploads++;
+		if ( vertices.Length != vertexCount ) throw new ArgumentException( "Vertex count changed", nameof(vertices) );
+		if ( !dynamicVertices )
+		{
+			// The first update moves the mesh to host-visible memory. Later updates are plain writes,
+			// safe because the renderer starts a frame only after the previous one finished drawing.
+			var old = VertexBuffer;
+			VertexBuffer = Device.ResourceFactory.CreateBuffer( new BufferDescription( old.SizeInBytes, BufferUsage.VertexBuffer | BufferUsage.Dynamic ) );
+			Render.ScheduleDelete( old.Dispose );
+			dynamicVertices = true;
+		}
+		Renderer.Write<Vertex>( VertexBuffer, vertices );
 	}
 
 	internal void Draw()
@@ -76,7 +88,7 @@ public class Model : Asset
 		commandList.SetVertexBuffer( 0, VertexBuffer );
 		commandList.SetPipeline( Material.Pipeline );
 
-		Material.CreateEphemeralResourceSet( out var resourceSets );
+		var resourceSets = Material.GetResourceSets();
 
 		for ( uint i = 0; i < resourceSets.Length; ++i )
 			commandList.SetGraphicsResourceSet( i, resourceSets[i] );

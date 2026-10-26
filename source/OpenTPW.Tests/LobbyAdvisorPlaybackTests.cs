@@ -131,6 +131,7 @@ public class LobbyAdvisorPlaybackTests
 		Assert.IsTrue( audio.IsPlaying( cue ), "The actual TW UI cue must resolve and start" );
 		advisor.Cancel();
 		Assert.IsTrue( audio.IsPlaying( cue ), "The independent cue survives speech cancellation" );
+		Assert.IsTrue( System.Threading.SpinWait.SpinUntil( () => !audio.Mixer.IsPending( cue ), 10000 ), "The cue decodes in the background" );
 		var pcm = new float[44100];
 		audio.Mixer.Read( pcm, 0, pcm.Length );
 		Assert.IsTrue( pcm.Any( value => Math.Abs( value ) > 0.00001f ), "The cue must decode to audible PCM" );

@@ -13,7 +13,10 @@ public sealed class SoundMixer : ISampleProvider
 		internal bool Loop;
 		internal long Delay;
 		internal uint Priority;
+		// Waiting for its PCM: counts as playing, but neither mixes nor ends.
+		internal bool Pending;
 	}
+	private Exception? failure;
 	private readonly object sync = new();
 	private readonly Dictionary<long, Voice> voices = new();
 	private long nextHandle;
@@ -50,7 +53,46 @@ public sealed class SoundMixer : ISampleProvider
 			return handle;
 		}
 	}
+	/// <summary>
+	/// Starts a voice whose PCM is still being decoded. It is playing from now on and starts sounding
+	/// (after its delay) once the data arrives; a decode failure is reported by <see cref="ThrowIfFailed"/>.
+	/// </summary>
+	public long Play( Task<float[]> samples, float volume = 1, bool loop = false, int delayMilliseconds = 0, uint priority = 0xffff )
+	{
+		if ( samples.IsCompletedSuccessfully ) return Play( samples.Result, volume, loop, delayMilliseconds, priority );
+		if ( !float.IsFinite( volume ) || volume < 0 || volume > 1 || delayMilliseconds < 0 ) throw new ArgumentOutOfRangeException( nameof(volume) );
+		long handle;
+		lock ( sync )
+		{
+			handle = checked(++nextHandle);
+			voices.Add( handle, new Voice { Volume = volume, Loop = loop, Pending = true,
+				Delay = (long)delayMilliseconds * WaveFormat.SampleRate / 1000 * WaveFormat.Channels, Priority = priority } );
+		}
+		samples.ContinueWith( task =>
+		{
+			lock ( sync )
+			{
+				if ( !voices.TryGetValue( handle, out var voice ) ) return;
+				if ( task.IsCompletedSuccessfully && task.Result.Length != 0 && task.Result.Length % WaveFormat.Channels == 0 )
+				{
+					voice.Samples = task.Result; voice.Pending = false; return;
+				}
+				voices.Remove( handle );
+				failure ??= task.Exception?.InnerException ?? new InvalidDataException( "Decoded audio has no complete frames" );
+			}
+		}, TaskScheduler.Default );
+		return handle;
+	}
+	/// <summary>Rethrows the first failed background decode on the caller's thread.</summary>
+	public void ThrowIfFailed()
+	{
+		Exception? error;
+		lock ( sync ) { error = failure; failure = null; }
+		if ( error != null ) throw new InvalidDataException( "Sound decoding failed", error );
+	}
 	public bool IsPlaying( long handle ) { lock ( sync ) return voices.ContainsKey( handle ); }
+	/// <summary>True while a voice started with a decoding task still waits for its PCM.</summary>
+	public bool IsPending( long handle ) { lock ( sync ) return voices.TryGetValue( handle, out var voice ) && voice.Pending; }
 	public void SetVolume( long handle, float volume )
 	{
 		if ( !float.IsFinite( volume ) || volume < 0 || volume > 1 ) throw new ArgumentOutOfRangeException( nameof(volume) );
@@ -79,6 +121,7 @@ public sealed class SoundMixer : ISampleProvider
 				int audible = 0;
 				foreach ( var (_, voice) in ordered )
 				{
+					if ( voice.Pending ) continue;
 					if ( voice.Delay > 0 ) { voice.Delay -= WaveFormat.Channels; continue; }
 					if ( voice.Position == voice.Samples.Length )
 					{
@@ -94,7 +137,7 @@ public sealed class SoundMixer : ISampleProvider
 				}
 			}
 			foreach ( var (handle, voice) in ordered )
-				if ( !voice.Loop && voice.Position == voice.Samples.Length ) voices.Remove( handle );
+				if ( !voice.Pending && !voice.Loop && voice.Position == voice.Samples.Length ) voices.Remove( handle );
 		}
 		for ( int i = offset; i < offset + count; ++i ) buffer[i] = Math.Clamp( buffer[i], -1, 1 );
 		return count;

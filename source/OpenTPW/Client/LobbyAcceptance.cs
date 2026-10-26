@@ -1,7 +1,5 @@
 #if DEBUG
-using System.Runtime.InteropServices;
 using System.Text.Json;
-using Veldrid;
 
 namespace OpenTPW;
 
@@ -113,30 +111,7 @@ internal sealed class LobbyAcceptance
 			new JsonSerializerOptions { WriteIndented = true } ) );
 		Log.Info( "Lobby acceptance PASS" );
 	}
-	private void Capture( string name )
-	{
-		// Read only the game's resolved render target, never the desktop or another application.
-		var source = Render.ResolveColorTexture;
-		using var staging = Device.ResourceFactory.CreateTexture( TextureDescription.Texture2D( source.Width, source.Height,
-			1, 1, PixelFormat.B8_G8_R8_A8_UNorm, TextureUsage.Staging ) );
-		using var commands = Device.ResourceFactory.CreateCommandList();
-		commands.Begin(); commands.CopyTexture( source, staging ); commands.End();
-		Device.SubmitCommands( commands ); Device.WaitForIdle();
-		var mapped = Device.Map( staging, MapMode.Read );
-		try
-		{
-			int stride = checked((int)source.Width * 4), height = checked((int)source.Height);
-			using var stream = File.Create( Path.Join( output, name + "_opentpw.bmp" ) );
-			using var writer = new BinaryWriter( stream );
-			// A negative DIB height preserves the top-first GPU rows without an extra image flip.
-			writer.Write( (ushort)0x4d42 ); writer.Write( 54 + stride * height ); writer.Write( 0 ); writer.Write( 54 );
-			writer.Write( 40 ); writer.Write( (int)source.Width ); writer.Write( -height );
-			writer.Write( (ushort)1 ); writer.Write( (ushort)32 ); writer.Write( 0 ); writer.Write( stride * height );
-			writer.Write( 0 ); writer.Write( 0 ); writer.Write( 0 ); writer.Write( 0 );
-			var row = new byte[stride];
-			for ( int y = 0; y < height; y++ ) { Marshal.Copy( mapped.Data + checked((int)(y * mapped.RowPitch)), row, 0, stride ); writer.Write( row ); }
-		}
-		finally { Device.Unmap( staging ); }
-	}
+	// Reads only the game's resolved render target, never the desktop or another application.
+	private void Capture( string name ) => FrameCapture.SaveBmp( Path.Join( output, name + "_opentpw.bmp" ) );
 }
 #endif

@@ -61,7 +61,7 @@ public sealed class AudioSystem : IDisposable
 			definition.Samples.Count == 1 && definition.Relations.Count == 0 && definition.DelayMin == 0 && definition.DelayMax == 0);
 		float gain = random.Range( definition.VolumeMin, definition.VolumeMax ) / 100f;
 		// 0x6b5b00 scores a voice as (priority << 16) plus a distance weight; lobby sounds have no position, so 0xffff.
-		long handle = Mixer.Play( Assets.Pcm( asset ), gain * ChannelVolume( category ),
+		long handle = Mixer.Play( Assets.PcmAsync( asset ), gain * ChannelVolume( category ),
 			directLoop, random.Range( definition.DelayMin, definition.DelayMax ), unchecked((sound.Priority << 16) + 0xffff) );
 		gains.Add( handle, new( category, gain ) );
 		if ( !directLoop && (sound.Flags & 4) != 0 ) repeating.Add( handle, new( directory, category, map, sound, definition, definition.Samples.ToList().IndexOf( sample ), handle ) );
@@ -77,6 +77,7 @@ public sealed class AudioSystem : IDisposable
 	}
 	public void Update()
 	{
+		Mixer.ThrowIfFailed();
 		foreach ( long handle in gains.Keys.ToArray() ) if ( !Mixer.IsPlaying( handle ) ) gains.Remove( handle );
 		foreach ( var (handle, entry) in repeating.ToArray() )
 		{
@@ -102,7 +103,7 @@ public sealed class AudioSystem : IDisposable
 			var sample = random.ChooseSample( definition, entry.SampleIndex, true );
 			if ( sample == null || sample.Bank == 0 ) { repeating.Remove( handle ); continue; }
 			float gain = random.Range( definition.VolumeMin, definition.VolumeMax ) / 100f;
-			long voice = Mixer.Play( Assets.Pcm( Assets.Sample( entry.Directory, entry.Map, sample ) ), gain * ChannelVolume( entry.Category ),
+			long voice = Mixer.Play( Assets.PcmAsync( Assets.Sample( entry.Directory, entry.Map, sample ) ), gain * ChannelVolume( entry.Category ),
 				delayMilliseconds: random.Range( definition.DelayMin, definition.DelayMax ), priority: unchecked((entry.Sound.Priority << 16) + 0xffff) );
 			gains.Add( voice, new( entry.Category, gain ) );
 			repeating[handle] = entry with { Definition = definition,

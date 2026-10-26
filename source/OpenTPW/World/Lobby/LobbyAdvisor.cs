@@ -75,7 +75,8 @@ public sealed class LobbyAdvisor
 			if ( sound.Definitions.Count != 1 || sound.Definitions[0].Samples.Count != 1 )
 				throw new InvalidDataException( "Advisor response requires a unique speech sample" );
 			var entry = sound.Definitions[0].Samples[0];
-			audio.Assets.Pcm( audio.Assets.Sample( "global/speech", map, entry ) );
+			// Decode in the background now; playback starts after the response delay.
+			_ = audio.Assets.PcmAsync( audio.Assets.Sample( "global/speech", map, entry ) );
 			// 0x595500 permits an absent LIP resource; row 0x257 explicitly uses lip ID zero.
 			byte[] boundaries = row.Lip == 0 ? BitConverter.GetBytes( -1 ) : FileSystem.ReadAllBytes( $"global/speech/lips/sp_{row.Lip:000}.lip" );
 			_ = new LobbyAdvisorLips( boundaries );

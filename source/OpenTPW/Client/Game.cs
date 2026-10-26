@@ -51,7 +51,8 @@ internal static class Game
 		//
 #if DEBUG
 		// Debug options: --verify-lobby <dir> runs scene transitions through production callbacks
-		// without injecting OS input; --lobby-view <file> pins the camera for retail comparison.
+		// without injecting OS input; --lobby-view <file> pins the camera for retail comparison;
+		// --capture-frames <dir> saves 30 consecutive frames after a 20 second warm-up.
 		var options = DebugOptions( args );
 		LobbyCameraMode.FixedViewPath = options.GetValueOrDefault( "--lobby-view" );
 #endif
@@ -60,6 +61,7 @@ internal static class Game
 		var level = new Level( "jungle", audio );
 #if DEBUG
 		LobbyAcceptance? acceptance = options.TryGetValue( "--verify-lobby", out var output ) ? new( level, output ) : null;
+		FrameCapture? frames = options.TryGetValue( "--capture-frames", out var framesOutput ) ? new( framesOutput ) : null;
 #endif
 
 		//
@@ -68,6 +70,7 @@ internal static class Game
 		Render.OnUpdate += level.Update;
 #if DEBUG
 		if ( acceptance != null ) Render.OnUpdate += acceptance.Update;
+		if ( frames != null ) Render.OnUpdate += frames.Update;
 #endif
 		Render.OnRender += level.Render;
 		Render.Run();
@@ -86,8 +89,8 @@ internal static class Game
 		var options = new Dictionary<string, string>();
 		for ( int i = 0; i < args.Length; i += 2 )
 		{
-			if ( args[i] is not ("--verify-lobby" or "--lobby-view") || i + 1 >= args.Length || !options.TryAdd( args[i], args[i + 1] ) )
-				throw new ArgumentException( $"Expected --verify-lobby <dir> and/or --lobby-view <file>, got: {string.Join( ' ', args )}" );
+			if ( args[i] is not ("--verify-lobby" or "--lobby-view" or "--capture-frames") || i + 1 >= args.Length || !options.TryAdd( args[i], args[i + 1] ) )
+				throw new ArgumentException( $"Expected --verify-lobby <dir>, --lobby-view <file>, --capture-frames <dir>, got: {string.Join( ' ', args )}" );
 		}
 		return options;
 	}
