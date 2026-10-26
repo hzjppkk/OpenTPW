@@ -1,4 +1,4 @@
-﻿namespace OpenTPW;
+namespace OpenTPW;
 
 /// <summary>
 /// Handles the creation and management of various systems, including the game
@@ -23,6 +23,7 @@ internal static class Game
 		FileSystem = new BaseFileSystem( $"{gamePath}/data/" );
 		FileSystem.RegisterArchiveHandler<WadArchive>( ".wad" );
 		FileSystem.RegisterArchiveHandler<SdtArchive>( ".sdt" );
+		LobbyOptionsSettings.Initialize();
 		// A language pack's data is searched before the game's, as if copied over it (retail install step).
 		string[]? packLanguages = null;
 		if ( !string.IsNullOrWhiteSpace( Settings.Default.LanguagePack ) )
@@ -66,10 +67,13 @@ internal static class Game
 		LobbyCameraMode.FixedViewPath = options.GetValueOrDefault( "--lobby-view" );
 #endif
 		using var audio = new AudioSystem( unchecked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()) );
+		audio.ConfigureQuality( LobbyOptionsSettings.Current.AudioQuality );
+		if ( LobbyOptionsSettings.Current.Preferences is { } preferences ) audio.ConfigurePreferences( preferences );
 		if ( !audio.Available ) Log.Warning( $"Audio output unavailable: {audio.Failure}" );
 		var level = new Level( "jungle", audio );
 #if DEBUG
 		LobbyAcceptance? acceptance = options.TryGetValue( "--verify-lobby", out var output ) ? new( level, output ) : null;
+		LobbyOptionsAcceptance? optionsAcceptance = options.TryGetValue( "--verify-options", out var optionsOutput ) ? new( level, optionsOutput ) : null;
 		FrameCapture? frames = options.TryGetValue( "--capture-frames", out var framesOutput ) ? new( framesOutput ) : null;
 #endif
 
@@ -79,6 +83,7 @@ internal static class Game
 		Render.OnUpdate += level.Update;
 #if DEBUG
 		if ( acceptance != null ) Render.OnUpdate += acceptance.Update;
+		if ( optionsAcceptance != null ) Render.OnUpdate += optionsAcceptance.Update;
 		if ( frames != null ) Render.OnUpdate += frames.Update;
 #endif
 		Render.OnRender += level.Render;
@@ -98,8 +103,8 @@ internal static class Game
 		var options = new Dictionary<string, string>();
 		for ( int i = 0; i < args.Length; i += 2 )
 		{
-			if ( args[i] is not ("--verify-lobby" or "--lobby-view" or "--capture-frames") || i + 1 >= args.Length || !options.TryAdd( args[i], args[i + 1] ) )
-				throw new ArgumentException( $"Expected --verify-lobby <dir>, --lobby-view <file>, --capture-frames <dir>, got: {string.Join( ' ', args )}" );
+			if ( args[i] is not ("--verify-lobby" or "--lobby-view" or "--capture-frames" or "--verify-options") || i + 1 >= args.Length || !options.TryAdd( args[i], args[i + 1] ) )
+				throw new ArgumentException( $"Expected --verify-lobby <dir>, --verify-options <dir>, --lobby-view <file>, --capture-frames <dir>, got: {string.Join( ' ', args )}" );
 		}
 		return options;
 	}

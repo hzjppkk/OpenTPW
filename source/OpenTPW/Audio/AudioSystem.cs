@@ -21,6 +21,9 @@ public sealed class AudioSystem : IDisposable
 	public bool Available { get; }
 	public string? Failure { get; }
 	private readonly float[] channelVolumes = new float[4];
+	private byte[] currentPreferences = new byte[39];
+	/// <summary>Snapshot the live options for modal preview rollback, including disabled channels' stored volumes.</summary>
+	public byte[] SnapshotPreferences() => (byte[])currentPreferences.Clone();
 
 	public AudioSystem( uint seed, bool openDevice = true )
 	{
@@ -113,10 +116,13 @@ public sealed class AudioSystem : IDisposable
 	public void ConfigurePreferences( byte[] preferences )
 	{
 		if ( preferences.Length != 39 ) throw new InvalidDataException( "Invalid audio preferences" );
+		// Validate the complete block before changing any channel or the rollback snapshot.
+		for ( int i = 0; i < 4; i++ )
+			if ( BitConverter.ToUInt32( preferences, i * 8 + 4 ) > 100 ) throw new InvalidDataException( "Invalid audio channel volume" );
+		currentPreferences = (byte[])preferences.Clone();
 		for ( int i = 0; i < 4; i++ )
 		{
 			uint volume = BitConverter.ToUInt32( preferences, i * 8 + 4 );
-			if ( volume > 100 ) throw new InvalidDataException( "Invalid audio channel volume" );
 			channelVolumes[i] = preferences[i * 8] == 0 ? 0 : volume / 100f;
 		}
 		// Category volume changes affect existing output too (0x4238c0 -> 0x518360/380/3a0).

@@ -1,7 +1,8 @@
-﻿using System.Text;
+using System.Text;
 
 namespace OpenTPW;
 
+/// <summary>Semantic UI strings across the 473-entry TW and 474-entry US language tables.</summary>
 public static class Localization
 {
 	private static StringFile UIStrings;
@@ -11,14 +12,10 @@ public static class Localization
 		UIStrings = new StringFile( GameLanguage.Path( "UITEXT.str" ) );
 	}
 
-	/// <summary>
-	/// File index of a <see cref="OpenTPW.UIStrings"/> value. The enum follows the 473-entry tables (v1 data:
-	/// TW, CN, the euro CD). Version 2.0 tables (US install, retail language packs) insert one string at 207
-	/// ("You cannot load this park, as it uses new rides..."), and the US exe pushes 0xf3 where TW pushes
-	/// 0xf2 for TypeYourName (TW 0x4a49f8, US 0x4a6f78).
-	/// </summary>
-	public static int FileIndex( UIStrings value, int count ) => count == 474 && (int)value >= 207 ? (int)value + 1 : (int)value;
+	public static int FileIndex( UIStrings key, int count ) => UiStringLayout.Index( key, count );
 
+	public static string Text( UIStrings key ) => UIStrings[UiStringLayout.Index( key, UIStrings.Entries.Length )];
+	/// <summary>Expands the existing #Name syntax through the selected table's layout.</summary>
 	private class LocalizationParser : BaseParser
 	{
 		public LocalizationParser( string input ) : base( input ) { }
@@ -39,7 +36,7 @@ public static class Localization
 					key = key.Trim();
 
 					var enumVal = Enum.Parse<UIStrings>( key );
-					sb.Append( UIStrings[FileIndex( enumVal, UIStrings.Entries.Length )] );
+					sb.Append( Text( enumVal ) );
 				}
 			}
 
@@ -51,5 +48,17 @@ public static class Localization
 	{
 		var parser = new LocalizationParser( str );
 		return parser.Parse();
+	}
+}
+
+/// <summary>US inserts the unavailable-downloaded-ride message at 207 into the older 473-entry UI table.</summary>
+internal static class UiStringLayout
+{
+	internal static int Index( UIStrings key, int count )
+	{
+		int index = (int)key;
+		if ( count is not (473 or 474) ) throw new InvalidDataException( $"Unsupported UITEXT table layout: {count} entries" );
+		if ( index < 0 || index >= 473 ) throw new ArgumentOutOfRangeException( nameof(key) );
+		return count == 474 && index >= 207 ? index + 1 : index;
 	}
 }

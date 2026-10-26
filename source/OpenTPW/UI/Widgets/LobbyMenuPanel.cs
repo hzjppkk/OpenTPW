@@ -3,48 +3,58 @@ using Veldrid;
 
 namespace OpenTPW;
 
-/// <summary>Local actions from the shared Escape menu (0x5dee20, 0x48a6c0, 0x489e00).</summary>
+/// <summary>Local actions and Options from the shared Escape menu (US 0x48c600, 0x48bd40).</summary>
 internal sealed class LobbyMenuPanel : Panel
 {
 	private readonly Level level;
 	private readonly RootPanel hud;
 	private readonly LobbyConfirmPanel confirmation;
+	private readonly LobbyUiModel backdrop;
 	private List<(UIStrings Action, LobbyUiText Text, Rectangle Bounds)> items = new();
 	private readonly Dictionary<bool, List<(UIStrings Action, LobbyUiText Text, Rectangle Bounds)>> layouts = new();
 	private ulong activatedFrame;
 	private int focused;
 	public bool Active { get; private set; }
+	internal event Action? OptionsRequested;
 	internal LobbyMenuPanel( Level level, LobbyConfirmPanel confirmation )
 	{
 		this.level = level; hud = level.Hud; this.confirmation = confirmation;
+		// US 0x492e80 creates the full-screen lolight underlay before its text children.
+		backdrop = new LobbyUiModel( "LOLIGHT", LobbyNamingPanel.Box( 0, 0, 2047, 1535 ) );
+		backdrop.PreloadAll();
+		layouts.Add( false, BuildLayout( false ) ); layouts.Add( true, BuildLayout( true ) );
 	}
 	internal void Show()
 	{
 		if ( Active || hud.Modal != null ) return;
 		focused = 0;
 		bool selected = level.Navigation!.Active;
-		// Retain both layouts so reopening the menu does not allocate new GPU text textures.
-		if ( layouts.TryGetValue( selected, out var cached ) ) items = cached;
-		else
-		{
-			items = new();
-			float top = 5;
-			void Add( UIStrings action )
-			{
-				// 0x490cd0 centres measured text, starts at y=5 and adds a five-unit row gap.
-				var label = new LobbyUiText( Localization.Parse( "#" + action ), new Rectangle( 0, 0, 2048, 1536 ), LobbyFonts.Name( 0 ) );
-				float width = label.Measure( label.Text ) * 3.2f, height = (label.LineHeight + 5) * 3.2f;
-				var bounds = new Rectangle( (2048 - width) / 2, top, width, height );
-				items.Add( (action, new LobbyUiText( label.Text, bounds, LobbyFonts.Name( 0 ) ), bounds) );
-				top += height + 5;
-			}
-			// The online service and engine-wide settings page are separate from these local routes.
-			if ( selected ) Add( UIStrings.SelectNewPlayer );
-			Add( UIStrings.ResumeGame ); Add( UIStrings.QuitGame );
-			layouts.Add( selected, items );
-		}
+		items = layouts[selected];
 		Active = true; activatedFrame = Input.FrameNumber; hud.Modal = this;
 	}
+	private List<(UIStrings Action, LobbyUiText Text, Rectangle Bounds)> BuildLayout( bool selected )
+	{
+		var result = new List<(UIStrings Action, LobbyUiText Text, Rectangle Bounds)>();
+		float top = 5;
+		void Add( UIStrings action )
+		{
+			var label = new LobbyUiText( Localization.Text( action ), new Rectangle( 0, 0, 2048, 1536 ), LobbyFonts.Name( 0 ) );
+			// US 0x492f60 centres measured font-0 text, starting at y=5 with a five-unit row gap.
+			float width = label.Measure( label.Text ) * 3.2f, height = (label.LineHeight + 5) * 3.2f;
+			var bounds = new Rectangle( (2048 - width) / 2, top, width, height );
+			// US 0x48b2a0 handles message 0x11 by making every menu item opaque cyan.
+			var text = new LobbyUiText( label.Text, bounds, LobbyFonts.Name( 0 ), 0x00afbeff );
+			text.Preload( new[] { text.Text } );
+			result.Add( (action, text, bounds) ); top += height + 5;
+		}
+		// US 0x48c600 adds Options (UITEXT 6) before SelectNewPlayer (13), Resume (7), Quit (8).
+		// Online actions remain dependent on the deferred city service.
+		Add( UIStrings.Options );
+		if ( selected ) Add( UIStrings.SelectNewPlayer );
+		Add( UIStrings.ResumeGame ); Add( UIStrings.QuitGame );
+		return result;
+	}
+
 	internal void Close()
 	{
 		Active = false;
@@ -54,7 +64,9 @@ internal sealed class LobbyMenuPanel : Panel
 	{
 		if ( !Active || !items.Any( item => item.Action == action ) ) throw new InvalidOperationException( "Inactive lobby menu action" );
 		if ( action == UIStrings.ResumeGame ) { Close(); return; }
-		// 0x489fff uses ConfirmNewPlayer; 0x48a109 uses ConfirmQuit. Cancellation keeps the menu.
+		// US 0x48bd40 closes the Escape menu before constructing the options page.
+		if ( action == UIStrings.Options ) { Close(); OptionsRequested?.Invoke(); return; }
+		// TW 0x489fff uses ConfirmNewPlayer; 0x48a109 uses ConfirmQuit. Cancellation keeps the menu.
 		confirmation.Show( Localization.Parse( action == UIStrings.SelectNewPlayer ? "#ConfirmNewPlayer" : "#ConfirmQuit" ), () =>
 		{
 			Close();
@@ -79,11 +91,7 @@ internal sealed class LobbyMenuPanel : Panel
 	protected override void OnRender()
 	{
 		if ( !Active ) return;
-		for ( int i = 0; i < items.Count; i++ )
-		{
-			// 0x489390 selects cyan (0,175,190); 0x490cd0 creates the default black text.
-			items[i].Text.Color = i == focused ? 0x00afbeffu : 0x000000ffu;
-			items[i].Text.Draw();
-		}
+		backdrop.Draw();
+		foreach ( var item in items ) item.Text.Draw();
 	}
 }

@@ -8,9 +8,12 @@ namespace OpenTPW;
 /// </summary>
 public class Sky : ModelEntity
 {
+	/// <summary>A retained sky layer whose visibility follows the live preset without rebuilding its model.</summary>
 	private sealed class SkyPart : ModelEntity
 	{
+		public Func<bool> Enabled = null!;
 		public SkyPart() => Layer = RenderLayer.Background;
+		protected override void OnRender() { if ( Enabled() ) base.OnRender(); }
 	}
 	// 0x5d3c20 sets the global background/fog colour 0x8c5b74 to 0xff44ddff. Island changes never alter it;
 	// SKYCOLOUR only recolours the first cloud layer.
@@ -22,6 +25,7 @@ public class Sky : ModelEntity
 	private LobbySkyGeometry geometry = null!;
 	private readonly LobbySkyColour colourState = new();
 	private int layerCount;
+	private LobbyQuality quality = null!;
 	private float flashStrength;
 	public Vector3 Color { get => color; set => SetColor( value ); }
 
@@ -51,27 +55,29 @@ public class Sky : ModelEntity
 		Model = Primitives.Cube.GenerateModel( material );
 		Scale = new Vector3( -10000f );
 
-		layerCount = LobbyQuality.Load().SkyLayers;
+		quality = LobbyQuality.Load();
+		layerCount = quality.SkyLayers;
 		geometry = LobbySkyGeometry.Load();
 		var cloudImage = LobbySkyGeometry.ReadTexture( "sky.tga" );
 		var cloudTexture = new Texture( cloudImage.Data, cloudImage.Width, cloudImage.Height, TextureFlags.Wrap );
-		for ( int layer = 0; layer < layerCount; layer++ )
+		for ( int layer = 0; layer < 4; layer++ )
 		{
 			var cloudMaterial = new Material<ObjectUniformBuffer>( "content/shaders/lobby-sky.shader", MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
 			cloudMaterial.Set( "Color", cloudTexture );
-			clouds.Add( new SkyPart { Model = new Model( geometry.CloudVertices( layer ), geometry.CloudIndices, cloudMaterial ) } );
+			int index = layer;
+			clouds.Add( new SkyPart { Enabled = () => index < quality.SkyLayers, Model = new Model( geometry.CloudVertices( layer ), geometry.CloudIndices, cloudMaterial ) } );
 		}
-		if ( layerCount == 0 ) return;
 		var horizonImage = LobbySkyGeometry.ReadTexture( "sky_cyl.tga" );
 		var horizonMaterial = new Material<ObjectUniformBuffer>( "content/shaders/lobby-sky.shader", MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
 		horizonMaterial.Set( "Color", new Texture( horizonImage.Data, horizonImage.Width, horizonImage.Height, TextureFlags.Wrap ) );
-		horizon = new SkyPart { Model = new Model( geometry.HorizonVertices(), LobbySkyGeometry.HorizonIndices(), horizonMaterial ) };
+		horizon = new SkyPart { Enabled = () => quality.SkyLayers != 0, Model = new Model( geometry.HorizonVertices(), LobbySkyGeometry.HorizonIndices(), horizonMaterial ) };
 	}
 
 	protected override void OnUpdate() => geometry.Advance( RetailTime.FrameSeconds );
 
 	protected override void OnRender()
 	{
+		layerCount = quality.SkyLayers;
 		// 0x5d4790 fills 0x8cae80 = sky object 0x8c9f20 + 0xf60: layer zero's colours.
 		colourState.Step( layerCount > 1 );
 		SetColor( Background * (1 - flashStrength) + Vector3.One * flashStrength );

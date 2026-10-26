@@ -3,6 +3,7 @@ namespace OpenTPW;
 /// <summary>Flying actors use the retail clock and target-seeking update.</summary>
 public sealed class LobbyFlock : Entity
 {
+	/// <summary>A retained render slot, enabled only while the simulation has a matching flying actor.</summary>
 	private sealed class Actor
 	{
 		public LobbyModel Model = null!;
@@ -14,8 +15,10 @@ public sealed class LobbyFlock : Entity
 	private readonly Vector3 extents;
 	private readonly LobbyQuality quality;
 	private readonly LobbyFlockSimulation simulation;
-	public int QualityPercent { get; set; }
-	public int ActorCount => actors.Count;
+	private int? qualityOverride;
+	/// <summary>Follow the live preset unless a caller explicitly overrides the object percentage.</summary>
+	public int QualityPercent { get => qualityOverride ?? quality.ObjectsPercent; set => qualityOverride = value; }
+	public int ActorCount => simulation.Actors.Count;
 
 	public LobbyFlock( LobbyFlyingMeshConfig config, Vector3 islandPosition, int qualityPercent, uint seed, LobbyQuality? quality = null )
 		: this( config, islandPosition, qualityPercent, new LobbyRandom( seed ), quality ) { }
@@ -26,29 +29,21 @@ public sealed class LobbyFlock : Entity
 		this.quality = quality ?? LobbyQuality.Load();
 		center = islandPosition + new Vector3( 0, 0, 50 );
 		extents = new Vector3( config.Extents.X, config.Extents.Z, config.Extents.Y );
-		QualityPercent = qualityPercent;
+		if ( qualityPercent != this.quality.ObjectsPercent ) qualityOverride = qualityPercent;
 		simulation = new LobbyFlockSimulation( config, center, extents, random );
+		var animation = AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, 0 );
+		for ( int i = 0; i < config.CountAtQuality( 100 ); i++ )
+			actors.Add( new Actor { Model = new LobbyModel( center, config.ModelPath,
+				$"{config.ResourceDirectory}/textures", animation, quality: this.quality ) { Visible = false } } );
 	}
 
 	protected override void OnUpdate()
 	{
 		simulation.Update( RetailTime.FrameTicks, QualityPercent );
-		while ( actors.Count > simulation.Actors.Count )
-		{
-			var actor = actors[^1];
-			actor.Model.Delete();
-			All.Remove( actor.Model );
-			actors.RemoveAt( actors.Count - 1 );
-		}
+		for ( int i = 0; i < actors.Count; i++ ) actors[i].Model.Visible = i < simulation.Actors.Count;
 		for ( int i = 0; i < simulation.Actors.Count; i++ )
 		{
 			var state = simulation.Actors[i];
-			if ( i == actors.Count )
-			{
-				var animation = AnimationFiles.Resolve( config.ModelPath, AnimationSlot.M, 0 );
-				actors.Add( new Actor { Model = new LobbyModel( state.Position, config.ModelPath,
-					$"{config.ResourceDirectory}/textures", animation, quality: quality ) } );
-			}
 			actors[i].Model.Position = state.Position;
 			actors[i].Model.Rotation = Facing( state.Direction );
 		}

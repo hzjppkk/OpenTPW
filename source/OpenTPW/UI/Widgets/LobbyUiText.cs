@@ -70,14 +70,26 @@ internal sealed class LobbyUiText : Panel
 		float top = units.Y / 3.2f + (units.Height / 3.2f - LineHeight * lines.Length) * VerticalAlignment / 2 + Offset.Y;
 		for ( int line = 0; line < lines.Length; line++ ) DrawLine( lines[line], top + line * LineHeight );
 	}
-	private void DrawLine( string text, float y )
+	/// <summary>Rasterize all possible option labels before interactive rendering starts.</summary>
+	internal void Preload( IEnumerable<string> values )
 	{
-		if ( text.Length == 0 ) return;
+		foreach ( string value in values )
+			foreach ( string line in value.Replace( "\r\n", "\n" ).Replace( '\r', '\n' ).Split( '\n' ) )
+				if ( line.Length != 0 ) Prepare( line );
+	}
+	private Texture Prepare( string text )
+	{
 		if ( !textures.TryGetValue( (text, Color), out var texture ) )
 		{
 			var image = Shadow ? RenderElement( font, text, Color ) : font.RenderString( text, Color );
 			textures.Add( (text, Color), texture = new Texture( image.Data, image.Width, image.Height, TextureFlags.PointFilter ) );
 		}
+		return texture;
+	}
+	private void DrawLine( string text, float y )
+	{
+		if ( text.Length == 0 ) return;
+		var texture = Prepare( text );
 		// The text itself keeps its place; a shadowed image starts 2 pixels further left.
 		float x = units.X / 3.2f + (units.Width / 3.2f - font.MeasureString( text )) * HorizontalAlignment / 2 + Offset.X - Scroll
 			- (Shadow ? ShadowOffset : 0);

@@ -7,6 +7,7 @@ namespace OpenTPW;
 internal sealed class LobbyKeyParticlePanel : Panel
 {
 	private readonly LobbyKeyParticles state;
+	private readonly LobbyQuality quality;
 	private readonly Vertex[] vertices = new Vertex[2048 * 6];
 	private readonly Model model;
 	private readonly SpriteSequenceFile sequences;
@@ -15,10 +16,8 @@ internal sealed class LobbyKeyParticlePanel : Panel
 	private bool affordable;
 	internal LobbyKeyParticlePanel()
 	{
-		var settings = new SettingsFile( $"{LobbyQuality.Load().Preset}.sam" );
-		if ( !int.TryParse( settings["GameOptions.PARTICLEDENSITY"], NumberStyles.Integer, CultureInfo.InvariantCulture, out int density ) )
-			throw new InvalidDataException( "Invalid particle density" );
-		state = new LobbyKeyParticles( FileSystem.ReadAllBytes( "Particle/Tp2.plb" ), density );
+		quality = LobbyQuality.Load();
+		state = new LobbyKeyParticles( FileSystem.ReadAllBytes( "Particle/Tp2.plb" ), quality.ParticleDensity );
 		sequences = new SpriteSequenceFile( FileSystem.ReadAllBytes( "esprites/Generic/Particles/SPR_PA.ESP" ) );
 		sprites = new SpriteTextureFile( FileSystem.ReadAllBytes( "esprites/Generic/Particles/SPR_PA.TPC" ) );
 		// Keep all authored frames: Key2 uses the sixteen-frame sequence 12 after the attraction phase.
@@ -55,7 +54,7 @@ internal sealed class LobbyKeyParticlePanel : Panel
 		else state.Stop( 97 );
 	}
 	// The particle clock uses the frontend's elapsed milliseconds, independently of capped camera dt.
-	internal void Advance( float seconds ) => state.Advance( seconds );
+	internal void Advance( float seconds ) { state.SetDensity( quality.ParticleDensity ); state.Advance( seconds ); }
 	protected override void OnRender()
 	{
 		Array.Clear( vertices );

@@ -1,4 +1,4 @@
-﻿using OpenTPW.UI;
+using OpenTPW.UI;
 
 namespace OpenTPW;
 
@@ -19,6 +19,8 @@ public class Level
 	internal LobbyIslandPanel? IslandMenu { get; private set; }
 	internal LobbyGlobePanel? GlobeMenu { get; private set; }
 	internal LobbyMenuPanel? Menu { get; private set; }
+	internal LobbyOptionsPanel? Options { get; private set; }
+	internal LobbyPlayerProfile? SelectedPlayer => selectedPlayer;
 	public bool FogEnabled => GlobeMenu?.Active != true;
 	/// <summary>Scene lighting: the globe page has its own ambient and light (0x5d8060), every other page the islands' (0x5dc390).</summary>
 	internal LobbyLighting Lighting => GlobeMenu?.Active == true ? LobbyLighting.Globe : LobbyLighting.Islands;
@@ -95,8 +97,7 @@ public class Level
 			IslandMenu.Activate();
 		};
 		var confirmation = new LobbyConfirmPanel( Hud );
-		Menu = Hud.AddChild( new LobbyMenuPanel( this, confirmation ) );
-		Hud.AddChild( confirmation );
+		Menu = new LobbyMenuPanel( this, confirmation );
 		PlayerMenu.QuitRequested += () => confirmation.Show( Localization.Parse( "#ConfirmQuit" ), () => Window.Current.SdlWindow.Close() );
 		LobbyCameraMode.IslandEntered += id =>
 		{
@@ -111,6 +112,7 @@ public class Level
 		if ( Audio != null )
 		{
 			Advisor = new LobbyAdvisor( Audio );
+			if ( LobbyOptionsSettings.Current.Preferences is { } defaults ) Advisor.Enabled = defaults[32] != 0;
 			Advisor.ResponseCue += response =>
 			{
 				if ( response == 0x189 )
@@ -126,6 +128,10 @@ public class Level
 
 		keyEffects = Hud.AddChild( new LobbyKeyParticlePanel() );
 		Hud.AddChild( new LobbyFadePanel() );
+		Hud.AddChild( Menu ); Hud.AddChild( confirmation );
+		// Options cover the Advisor and existing pages, while the cursor remains the final UI layer.
+		Options = Hud.AddChild( new LobbyOptionsPanel( this ) );
+		Menu.OptionsRequested += Options.Show;
 		Hud.AddChild( new Cursor() );
 	}
 

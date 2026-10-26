@@ -69,7 +69,7 @@ internal sealed class LobbyPlayerPanel : Panel
 		// Publish a complete profile before exposing the occupied slot or changing pages.
 		try
 		{
-			var profile = store.Create( flow.ActiveSlot, flow.ResolveName(), mode );
+			var profile = store.Create( flow.ActiveSlot, flow.ResolveName(), mode, LobbyOptionsSettings.Current.Preferences );
 			flow.Confirm();
 			flow.Adopt( profile );
 			Commit( profile );

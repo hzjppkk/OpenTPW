@@ -20,6 +20,11 @@ public sealed class LobbyModel : Entity
 		public Vertex[] Vertices = null!;
 		public Matrix4x4 World;
 		public bool Animated;
+		public bool LitEnabled;
+		public Material<ObjectUniformBuffer> Material = null!;
+		public Texture[] FullTextures = null!, SmallTextures = null!;
+		public bool Small;
+		public SamplerType Sampler;
 		// Lighting inputs the current vertex colours were computed with.
 		public LobbyLighting? LitWith;
 		public Quaternion LitRotation;
@@ -28,7 +33,8 @@ public sealed class LobbyModel : Entity
 	}
 
 	private readonly ModelFile modelFile;
-	private readonly bool lightingEnabled;
+	private readonly LobbyQuality quality;
+	private bool LightingEnabled => quality.LightingEnabled;
 	private readonly List<Part> parts = new();
 	private ModelAnimation? animation;
 	private float startedAt;
@@ -42,8 +48,7 @@ public sealed class LobbyModel : Entity
 	{
 		Position = position;
 		quality ??= LobbyQuality.Load();
-		lightingEnabled = quality.LightingEnabled;
-		textureDirectory = quality.TextureDirectory( textureDirectory );
+		this.quality = quality;
 		Rotation = Quaternion.Identity;
 		// A missing model throws with its full path instead of failing later on a null stream.
 		modelPath = AnimationFiles.ResolveModel( modelPath );
@@ -57,46 +62,54 @@ public sealed class LobbyModel : Entity
 			foreach ( var batch in LobbyModelBatches.Create( mesh ) )
 			{
 				var material = new Material<ObjectUniformBuffer>( sharedShader ??= new Shader( "content/shaders/lobby-model.shader" ) );
-				var textures = new Texture[16];
-				for ( int i = 0; i < textures.Length; i++ )
+				Texture[] LoadTextures( string directory )
 				{
-					int materialIndex = batch.FirstMaterial + i;
-					var name = materialIndex < mesh.Materials.Length ? mesh.Materials[materialIndex].Name?.TrimEnd( '\0' ) : null;
-					if ( string.IsNullOrEmpty( name ) )
-						textures[i] = whiteTexture ??= Texture.Missing;
-					else
+					var textures = new Texture[16];
+					for ( int i = 0; i < textures.Length; i++ )
 					{
-						var texture = textureResolver?.Invoke( name );
-						if ( texture == null )
+						int materialIndex = batch.FirstMaterial + i;
+						var name = materialIndex < mesh.Materials.Length ? mesh.Materials[materialIndex].Name?.TrimEnd( '\0' ) : null;
+						if ( string.IsNullOrEmpty( name ) )
+							textures[i] = whiteTexture ??= Texture.Missing;
+						else
 						{
-							string texturePath = $"{textureDirectory}/{name}.wct";
-							try
+							var texture = textureResolver?.Invoke( name );
+							if ( texture == null )
 							{
-								texturePath = AnimationFiles.ResolveFile( texturePath, "Texture" );
-							}
-							catch ( FileNotFoundException ) when ( name.Equals( "signgrab", StringComparison.OrdinalIgnoreCase ) )
-							{
-								// 0x572440 -> 0x571ea0 falls back to the cache's default texture.
-								// 0x571060 initializes it from this shipped TGA, not a white pixel.
-								Log.Warning( $"Missing lobby material {name} in {modelPath}: {texturePath}; using retail default" );
-								texturePath = AnimationFiles.ResolveFile( "generic/defaulttexture/NotFound.tga", "Retail default texture" );
-							}
-							if ( texture == null && !TextureCache.TryGetValue( texturePath, out texture ) )
-							{
-								if ( texturePath.HasExtension( ".wct" ) ) texture = new Texture( texturePath, TextureFlags.Repeat );
-								else
+								string texturePath = $"{directory}/{name}.wct";
+								try
 								{
-									// Game-data TGAs use the virtual filesystem, unlike engine-content image paths.
-									using var stream = FileSystem.OpenRead( texturePath );
-									texture = new Texture( stream, TextureFlags.Repeat );
+									texturePath = AnimationFiles.ResolveFile( texturePath, "Texture" );
 								}
-								TextureCache[texturePath] = texture;
+								catch ( FileNotFoundException ) when ( name.Equals( "signgrab", StringComparison.OrdinalIgnoreCase ) )
+								{
+									// 0x572440 -> 0x571ea0 falls back to the cache's default texture.
+									// 0x571060 initializes it from this shipped TGA, not a white pixel.
+									Log.Warning( $"Missing lobby material {name} in {modelPath}: {texturePath}; using retail default" );
+									texturePath = AnimationFiles.ResolveFile( "generic/defaulttexture/NotFound.tga", "Retail default texture" );
+								}
+								if ( texture == null && !TextureCache.TryGetValue( texturePath, out texture ) )
+								{
+									if ( texturePath.HasExtension( ".wct" ) ) texture = new Texture( texturePath, TextureFlags.Repeat );
+									else
+									{
+										// Game-data TGAs use the virtual filesystem, unlike engine-content image paths.
+										using var stream = FileSystem.OpenRead( texturePath );
+										texture = new Texture( stream, TextureFlags.Repeat );
+									}
+									TextureCache[texturePath] = texture;
+								}
 							}
+							textures[i] = texture;
 						}
-						textures[i] = texture;
 					}
+					return textures;
 				}
-				material.Set( "Color", textures, batch.Wrap ? SamplerType.AnisotropicWrap : SamplerType.Anisotropic );
+				var fullTextures = LoadTextures( textureDirectory );
+				var smallDirectory = LobbyQuality.Load( "low" ).TextureDirectory( textureDirectory );
+				var smallTextures = smallDirectory == textureDirectory ? fullTextures : LoadTextures( smallDirectory );
+				var sampler = batch.Wrap ? SamplerType.AnisotropicWrap : SamplerType.Anisotropic;
+				material.Set( "Color", quality.UseSmallTextures ? smallTextures : fullTextures, sampler );
 
 				var vertices = new Vertex[mesh.Vertices.Length];
 				for ( int i = 0; i < vertices.Length; i++ )
@@ -109,13 +122,15 @@ public sealed class LobbyModel : Entity
 					vertices[i].MatFlags = textureIndex < mesh.Materials.Length ? mesh.Materials[textureIndex].Flags : 0;
 				}
 
-				var part = new Part { MeshIndex = meshIndex, Mesh = mesh, Vertices = vertices, World = mesh.WorldTransform };
+				var part = new Part { MeshIndex = meshIndex, Mesh = mesh, Vertices = vertices, World = mesh.WorldTransform,
+					Material = material, FullTextures = fullTextures, SmallTextures = smallTextures,
+					Small = quality.UseSmallTextures, Sampler = sampler, LitEnabled = LightingEnabled };
 				Bake( part, null );
-				Light( part, CurrentLighting, Rotation, lightingEnabled );
+				Light( part, CurrentLighting, Rotation, LightingEnabled );
 				part.Model = new Model( vertices, batch.Indices, material );
 				part.Entity = new ModelEntity { Model = part.Model, Position = Position, Rotation = Rotation, Scale = Scale };
 				parts.Add( part );
-				}
+			}
 		}
 
 		if ( animationPath != null )
@@ -174,6 +189,12 @@ public sealed class LobbyModel : Entity
 
 	protected override void OnUpdate()
 	{
+		// Pooled flock slots retain GPU resources but must not animate or upload invisible geometry.
+		if ( !Visible )
+		{
+			foreach ( var part in parts ) part.Entity.Model = null;
+			return;
+		}
 		ModelPose? pose = null;
 		if ( animation != null )
 		{
@@ -187,6 +208,11 @@ public sealed class LobbyModel : Entity
 		foreach ( var part in parts )
 		{
 			int i = part.MeshIndex;
+			if ( part.Small != quality.UseSmallTextures )
+			{
+				part.Small = quality.UseSmallTextures;
+				part.Material.Set( "Color", part.Small ? part.SmallTextures : part.FullTextures, part.Sampler );
+			}
 			part.Entity.Position = Position;
 			part.Entity.Rotation = Rotation;
 			part.Entity.Scale = Scale;
@@ -210,10 +236,11 @@ public sealed class LobbyModel : Entity
 			}
 			// 0x577000 relights a mesh whenever the light version changes, which every camera update does
 			// (0x5d3eb0 re-aims the light); node motion and the model's rotation also move it in node space.
-			if ( part.LitWith != lighting || part.LitDirection != LobbyLighting.WorldDirection
+			if ( part.LitEnabled != LightingEnabled || part.LitWith != lighting || part.LitDirection != LobbyLighting.WorldDirection
 				|| part.LitRotation != Rotation || part.LitWorld != part.World )
 			{
-				Light( part, lighting, Rotation, lightingEnabled );
+				part.LitEnabled = LightingEnabled;
+				Light( part, lighting, Rotation, LightingEnabled );
 				changed = true;
 			}
 			if ( changed ) part.Model.UpdateVertices( part.Vertices );

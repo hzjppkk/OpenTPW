@@ -40,6 +40,12 @@ internal sealed class Settings
 
 	public string LobbyQuality { get; set; } = "med";
 
+	/// <summary>US sound quality percentage; null uses SoundInfo.DEFAULTQUALITY from sound.sam.</summary>
+	public int? AudioQuality { get; set; }
+
+	/// <summary>The 39-byte default preferences for the lobby and newly created players, without progress fields.</summary>
+	public byte[]? LobbyPreferences { get; set; }
+
 	[JsonIgnore]
 	public string FilePath { get; private set; } = "";
 
@@ -68,9 +74,12 @@ internal sealed class Settings
 	public void Save()
 	{
 		var temporary = FilePath + ".tmp";
-		File.WriteAllBytes( temporary, JsonSerializer.SerializeToUtf8Bytes( this, json ) );
+		File.WriteAllBytes( temporary, Serialize() );
 		File.Move( temporary, FilePath, true );
 	}
+
+	/// <summary>Serialize with the same strict schema and point representation for multi-file option commits.</summary>
+	internal byte[] Serialize() => JsonSerializer.SerializeToUtf8Bytes( this, json );
 
 	/// <summary>Writes a point as [x, y].</summary>
 	private sealed class PointConverter : JsonConverter<Point>

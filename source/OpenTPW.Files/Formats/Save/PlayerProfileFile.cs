@@ -5,12 +5,38 @@ namespace OpenTPW;
 /// <summary>Version 12 gms.dat (0x5ac370, 0x5ad180, 0x423980). Unknown fields are retained byte for byte.</summary>
 public sealed class PlayerProfileFile
 {
+	/// <summary>The four enabled/volume pairs in the US 0x423e90 preference block.</summary>
+	public enum SoundChannel { Effects, Music, Speech, Movie }
+	/// <summary>The seven trailing preference bytes serialized by US 0x423e90.</summary>
+	public enum Preference { Advisor, Tutorial, Tooltips, ConfirmDelete, RightMouseScroll, RightMouseCancel, Isometric }
 	public sealed record Segment( string Name, byte[] Data );
 	public byte[] Prefix { get; }
 	public IReadOnlyList<Segment> Segments { get; }
 	public byte[] Preferences { get; }
 	public ushort[] RideIds { get; }
 	public byte CreationMode => Prefix[14];
+	private static int SoundOffset( SoundChannel channel ) => channel is >= SoundChannel.Effects and <= SoundChannel.Movie
+		? (int)channel * 8 : throw new ArgumentOutOfRangeException( nameof(channel) );
+	private static int PreferenceOffset( Preference preference ) => preference is >= Preference.Advisor and <= Preference.Isometric
+		? 32 + (int)preference : throw new ArgumentOutOfRangeException( nameof(preference) );
+	public bool SoundEnabled( SoundChannel channel ) => Preferences[SoundOffset( channel )] != 0;
+	public void SetSoundEnabled( SoundChannel channel, bool enabled )
+	{
+		// Native reads only the low byte of the four-byte enabled field. Preserve its padding.
+		Preferences[SoundOffset( channel )] = enabled ? (byte)1 : (byte)0;
+	}
+	public int SoundVolume( SoundChannel channel )
+	{
+		uint value = BitConverter.ToUInt32( Preferences, SoundOffset( channel ) + 4 );
+		return value <= 100 ? (int)value : throw new InvalidDataException( "Player volume must be between 0 and 100" );
+	}
+	public void SetSoundVolume( SoundChannel channel, int volume )
+	{
+		if ( volume is < 0 or > 100 ) throw new ArgumentOutOfRangeException( nameof(volume) );
+		BitConverter.TryWriteBytes( Preferences.AsSpan( SoundOffset( channel ) + 4, 4 ), (uint)volume );
+	}
+	public bool Enabled( Preference preference ) => Preferences[PreferenceOffset( preference )] != 0;
+	public void SetEnabled( Preference preference, bool enabled ) => Preferences[PreferenceOffset( preference )] = enabled ? (byte)1 : (byte)0;
 	private PlayerProfileFile( byte[] prefix, Segment[] segments, byte[] preferences, ushort[] rides )
 	{
 		Prefix = prefix;

@@ -5,6 +5,7 @@ namespace OpenTPW;
 /// <summary>A model control fitted through the native 2048x1536 UI coordinate space.</summary>
 internal sealed class LobbyUiModel : Panel
 {
+	/// <summary>One material batch of a prepared model state, with reusable projected vertices.</summary>
 	private sealed record Part( Model Model, Vertex[] Vertices, System.Numerics.Vector3[] Positions, LobbyButtonGeometry Geometry );
 	private readonly Dictionary<int, List<Part>> states = new();
 	private static readonly Dictionary<string, LobbyButtonGeometry> geometries = new( StringComparer.OrdinalIgnoreCase );
@@ -21,6 +22,16 @@ internal sealed class LobbyUiModel : Panel
 		this.modelName = modelName.Replace( '\\', '/' );
 		Bounds = units;
 		states.Add( 0, Build( 0 ) );
+	}
+	/// <summary>Prepare interactive states during scene construction, outside the frame loop.</summary>
+	internal void Preload( params int[] values )
+	{
+		foreach ( int value in values ) if ( !states.ContainsKey( value ) ) states.Add( value, Build( value ) );
+	}
+	internal void PreloadAll()
+	{
+		var geometry = geometries[$"{modelName}:0"];
+		Preload( Enumerable.Range( 0, geometry.StateRoots.Length ).ToArray() );
 	}
 	private List<Part> Build( int state )
 	{

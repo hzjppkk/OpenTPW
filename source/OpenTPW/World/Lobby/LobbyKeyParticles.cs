@@ -28,7 +28,7 @@ internal sealed class LobbyKeyParticles
 	/// <summary>Point force from the PLB influencer table; when its life ends it starts <c>Child</c> (-1 for none) at its position.</summary>
 	private sealed record Influencer( int X, int Y, int Z, int Force, int Child ) { internal int Life; }
 	private readonly byte[] library;
-	private readonly int density;
+	private int density;
 	private readonly List<Emitter> emitters = new();
 	private readonly List<Influencer> influencers = new();
 	private int random = 1, steps;
@@ -76,6 +76,26 @@ internal sealed class LobbyKeyParticles
 		Signed( spread ); Signed( spread ); Signed( spread );
 		emitter.Life = emitter.InitialLife = emitter.Int( 0x20 );
 		emitter.InitialCount = Scale( emitter.Int( 0x60 ) );
+		ScaleEmitter( emitter );
+		emitters.Insert( 0, emitter );
+		for ( int i = 0; i < emitter.InitialCount; i++ ) Spawn( emitter );
+		if ( emitter.Int( 0xb4 ) >= 0 )
+		{
+			if ( emitter.Int( 0xb4 ) != 5 || emitter.Data[0xba] != 1 ) throw new InvalidDataException( "Unsupported key child effect" );
+			AddInfluencer( 5, emitter );
+		}
+	}
+
+	/// <summary>Reapply density to live emitters without respawning particles or resetting their clocks.</summary>
+	internal void SetDensity( int value )
+	{
+		if ( value < 1 || value > 4096 ) throw new ArgumentOutOfRangeException( nameof(value) );
+		if ( density == value ) return;
+		density = value;
+		foreach ( var emitter in emitters ) ScaleEmitter( emitter );
+	}
+	private void ScaleEmitter( Emitter emitter )
+	{
 		emitter.Limit = Scale( emitter.Short( 0x64 ) );
 		for ( int i = 0; i < 4; i++ )
 		{
@@ -83,13 +103,6 @@ internal sealed class LobbyKeyParticles
 			int rate = unchecked((sbyte)emitter.Data[0x68 + i]);
 			int scaled = density * rate >> 10;
 			emitter.Rates[i] = rate == 0 ? 0 : scaled == 0 ? 1 : Math.Min( 127, scaled );
-		}
-		emitters.Insert( 0, emitter );
-		for ( int i = 0; i < emitter.InitialCount; i++ ) Spawn( emitter );
-		if ( emitter.Int( 0xb4 ) >= 0 )
-		{
-			if ( emitter.Int( 0xb4 ) != 5 || emitter.Data[0xba] != 1 ) throw new InvalidDataException( "Unsupported key child effect" );
-			AddInfluencer( 5, emitter );
 		}
 	}
 

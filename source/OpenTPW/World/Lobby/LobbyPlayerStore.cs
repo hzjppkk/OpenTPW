@@ -24,14 +24,15 @@ public sealed class LobbyPlayerStore
 		return PlayerProfileFile.Read( File.ReadAllBytes( Path.Combine( expected, "gms.dat" ) ) );
 	}
 
-	public LobbyPlayerProfile Create( int slot, string name, byte creationMode )
+	public LobbyPlayerProfile Create( int slot, string name, byte creationMode, byte[]? preferences = null )
 	{
 		var flow = new LobbyPlayerFlow( new LobbyPlayerProfile?[4] );
 		if ( !flow.Select( slot ) ) throw new ArgumentOutOfRangeException( nameof(slot) );
 		flow.Name = name;
 		if ( !flow.CanConfirm || flow.ResolveName() != name ) throw new ArgumentException( "Invalid player name", nameof(name) );
 		if ( ReadSlots()[slot] != null ) throw new IOException( "Player slot is already occupied" );
-		var profileData = PlayerProfileFile.Create( creationMode, PlayerProfileFile.DefaultPreferences( new SettingsFile( data.OpenRead( "sound.sam" ) ) ) );
+		// A new player inherits accepted global defaults; existing profiles retain their own preferences.
+		var profileData = PlayerProfileFile.Create( creationMode, preferences ?? PlayerProfileFile.DefaultPreferences( new SettingsFile( data.OpenRead( "sound.sam" ) ) ) );
 		// Normal lobby creation grants one key before saving (0x4a44e0 -> 0x5ac050 -> 0x5c3b00).
 		// Keep this inside the staged transaction so retries cannot grant another key to an occupied slot.
 		LobbyPlayerProgress.GrantIntroductionKey( profileData );
