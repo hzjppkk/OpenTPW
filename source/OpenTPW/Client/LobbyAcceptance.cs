@@ -94,7 +94,15 @@ internal sealed class LobbyAcceptance
 				if ( empty < 0 ) throw new InvalidOperationException( "Naming acceptance needs an empty test slot" );
 				level.PlayerMenu!.Select( empty ); Next( 11 ); break;
 			case 11 when elapsed > 0.5:
-				Capture( "lobby-naming" ); level.PlayerMenu!.Cancel();
+				Capture( "lobby-naming" );
+				// Hover OK through the input snapshot: help 360 and its MessageTag1 (0x48b9f0).
+				Input.PointerOverride = new Vector2( (1376 + 1460) / 2f * Screen.Size.X / 2048, (524 + 608) / 2f * Screen.Size.Y / 1536 );
+				Next( 30 ); break;
+			case 30 when elapsed > 0.3:
+				Capture( "lobby-naming-help" );
+				Check( level.Help?.Shown == 360, "hovering OK shows UIHELPTEXT 360" );
+				Input.PointerOverride = null; level.PlayerMenu!.Cancel();
+				Check( level.Help?.Shown == -1, "closing the naming dialog hides the help strip" );
 				Check( level.PlayerMenu.Browsing, "naming cancellation returns to profile selection without creating data" ); Next( 12 ); break;
 			case 12 when elapsed > 0.5:
 				level.HandleEscape(); level.Menu!.Choose( UIStrings.QuitGame ); Next( 13 ); break;

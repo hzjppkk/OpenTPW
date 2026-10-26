@@ -28,6 +28,9 @@ public class Level
 	public event Action<LobbyPlayerProfile, LobbyIslandConfig>? ParkEntryRequested;
 	private LobbyPlayerProfile? selectedPlayer;
 	private LobbyKeyParticlePanel? keyEffects;
+	internal LobbyKeyParticlePanel? KeyEffects => keyEffects;
+	/// <summary>Hover help strip shared by the lobby pages and dialogs (0x7ca0c0).</summary>
+	internal LobbyHelpBar? Help { get; private set; }
 
 	public SettingsFile Global { get; private init; }
 
@@ -132,6 +135,7 @@ public class Level
 		// Options cover the Advisor and existing pages, while the cursor remains the final UI layer.
 		Options = Hud.AddChild( new LobbyOptionsPanel( this ) );
 		Menu.OptionsRequested += Options.Show;
+		Help = Hud.AddChild( new LobbyHelpBar() );
 		Hud.AddChild( new Cursor() );
 	}
 

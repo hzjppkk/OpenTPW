@@ -43,6 +43,12 @@ internal sealed class LobbyKeyParticlePanel : Panel
 		model = new Model( vertices, material );
 	}
 	internal void IntroductionKey() => state.Start( 87, 90000, 7000 );
+	/// <summary>MessageTag1 at the integer centre of a UI rectangle (0x484e40: x × 100000 / 2048, y × 75000 / 1536).</summary>
+	internal void MessageTag( Rectangle units )
+	{
+		int left = (int)units.X, top = (int)units.Y, right = (int)(units.X + units.Width), bottom = (int)(units.Y + units.Height);
+		state.Start( 90, (left + (right - left) / 2) * 100000 / 2048, (top + (bottom - top) / 2) * 75000 / 1536 );
+	}
 	// 0x4b6a30 uses the integer centre of element 0x1e0ea (554,170)-(990,437).
 	internal void EnterIsland() => state.Start( 98, 50000, (170 + (437 - 170) / 2) * 75000 / 1536 );
 	internal void SetAffordable( bool value )

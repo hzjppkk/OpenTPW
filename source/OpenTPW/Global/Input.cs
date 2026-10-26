@@ -92,12 +92,20 @@ public static partial class Input
 		}
 	}
 
+#if DEBUG
+	/// <summary>Window position the acceptance run hovers over instead of the system mouse; the OS cursor is never moved.</summary>
+	internal static Vector2? PointerOverride { get; set; }
+#endif
+
 	public static void UpdateFrom( InputSnapshot inputSnapshot )
 	{
 		FrameNumber++;
 		IsSystemCursorVisible = true;
 
 		var mousePos = new Vector2( inputSnapshot.MousePosition.X, inputSnapshot.MousePosition.Y );
+#if DEBUG
+		if ( PointerOverride is { } pointer ) mousePos = pointer;
+#endif
 		var mouseInfo = new MouseInfo
 		{
 			Delta = Mouse.Position - mousePos,

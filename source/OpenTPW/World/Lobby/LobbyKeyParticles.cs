@@ -63,10 +63,11 @@ internal sealed class LobbyKeyParticles
 
 	internal void Start( int id, int x, int z )
 	{
-		if ( id is not (87 or 88 or 97 or 98) ) throw new ArgumentOutOfRangeException( nameof(id) );
+		// 90 is MessageTag1, placed on a UI element whose help is shown (0x484e40).
+		if ( id is not (87 or 88 or 90 or 97 or 98) ) throw new ArgumentOutOfRangeException( nameof(id) );
 		var emitter = new Emitter { Id = id, Data = library.AsSpan( 8 + id * 320, 320 ).ToArray(), X = x >> 4, Y = 0, Z = z >> 4 };
-		bool animated = id is 88 or 97;
-		if ( emitter.Data[4] != (id == 97 ? 0 : 4) || emitter.Data[5] != 1 || emitter.Short( 0x0e ) != 0 ||
+		bool animated = id is 88 or 90 or 97;
+		if ( emitter.Data[4] != (id == 97 ? 0 : id == 90 ? 3 : 4) || emitter.Data[5] != 1 || emitter.Short( 0x0e ) != 0 ||
 			emitter.Short( 0x94 ) != (animated ? 12 : 15) || emitter.Short( 0x96 ) != (animated ? 16 : 1) || emitter.Short( 0xa2 ) != 1000 ||
 			emitter.Int( 0x58 ) != 0 || emitter.Int( 0x98 ) != -1 )
 			throw new InvalidDataException( $"Unsupported key emitter {id}" );
@@ -81,8 +82,12 @@ internal sealed class LobbyKeyParticles
 		for ( int i = 0; i < emitter.InitialCount; i++ ) Spawn( emitter );
 		if ( emitter.Int( 0xb4 ) >= 0 )
 		{
-			if ( emitter.Int( 0xb4 ) != 5 || emitter.Data[0xba] != 1 ) throw new InvalidDataException( "Unsupported key child effect" );
-			AddInfluencer( 5, emitter );
+			// KeyPuff starts influencer 5, MessageTag1 influencer 3 (UIRepel: +0x40 = −1, life 30).
+			// 0x51da3c compares influencer +0x40 with each emitter's first byte (−1 matches all); it is applied
+			// here as a force, as for KeyPuff's −2.
+			int child = emitter.Int( 0xb4 );
+			if ( child != (id == 90 ? 3 : 5) || emitter.Data[0xba] != 1 ) throw new InvalidDataException( "Unsupported key child effect" );
+			AddInfluencer( child, emitter );
 		}
 	}
 

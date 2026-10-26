@@ -23,6 +23,8 @@ internal sealed class LobbyNamingPanel : Panel
 	private readonly LobbyUiModel selection, modeIcon;
 	private float editedAt;
 	private bool nameFocused;
+	/// <summary>Elements whose help has already placed a MessageTag1 since the dialog opened (element property 0xa).</summary>
+	private readonly HashSet<int> tagged = new();
 	public byte CreationMode { get; private set; } = 1;
 	public bool Active { get; set; }
 
@@ -68,6 +70,44 @@ internal sealed class LobbyNamingPanel : Panel
 		name.Text = edit.Text; name.Scroll = 0;
 		nameFocused = true; Active = true; editedAt = Time.Now;
 		CreationMode = 1;
+		tagged.Clear();
+	}
+
+	/// <summary>
+	/// UIHELPTEXT numbers from the naming table's key 0x11 (US 0x753f68–0x7540a8): Exit 2, OK 360, name 356,
+	/// Instant Action 358, Full Simulation 359. A selected toggle answers key 0x12 instead (0x663890 reads
+	/// +0x94 when +0x138 is 1, inferred to be the help lookup), which is −1 here.
+	/// </summary>
+	private static readonly (Rectangle Bounds, int Help, int Selected)[] helpElements =
+	[
+		(Box( 1387, 613, 1470, 696 ), 2, 2), (Box( 1376, 524, 1460, 608 ), 360, 360), (Box( 593, 616, 1216, 698 ), 356, 356),
+		(Box( 764, 405, 1206, 476 ), 358, -1), (Box( 764, 498, 1206, 569 ), 359, -1),
+	];
+
+	/// <summary>
+	/// Shows the hovered element's help (0x4924b0) and, on its first help in this dialog, places MessageTag1 at
+	/// its centre (0x48b9f0 event 0x11 → 0x484e40(0x5a)).
+	/// </summary>
+	private void UpdateHelp()
+	{
+		var level = Level.Current;
+		if ( level?.Help is not { } help ) return;
+		int index = Array.FindIndex( helpElements, element => Hit( element.Bounds ) );
+		int number = -1;
+		if ( index >= 0 )
+		{
+			bool selected = index == 3 ? CreationMode == 1 : index == 4 && CreationMode == 0;
+			number = selected ? helpElements[index].Selected : helpElements[index].Help;
+		}
+		if ( number >= 0 && tagged.Add( index ) ) level.KeyEffects?.MessageTag( helpElements[index].Bounds );
+		help.Show( number );
+	}
+
+	/// <summary>Hides the help strip when the dialog closes.</summary>
+	public void Close()
+	{
+		Active = false;
+		Level.Current?.Help?.Show( -1 );
 	}
 	public void ShowError( string message ) => error.Text = message;
 	protected override void OnUpdate()
@@ -103,6 +143,7 @@ internal sealed class LobbyNamingPanel : Panel
 		SetButtonText( simulationText, simulation.State );
 		okay.State = State( Box( 1376, 524, 1460, 608 ) );
 		exit.State = State( Box( 1387, 613, 1470, 696 ) );
+		UpdateHelp();
 		if ( Input.LeftPressed )
 		{
 			if ( Hit( Box( 593, 616, 1216, 698 ) ) )

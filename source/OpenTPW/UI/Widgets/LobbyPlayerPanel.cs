@@ -74,7 +74,7 @@ internal sealed class LobbyPlayerPanel : Panel
 			flow.Adopt( profile );
 			Commit( profile );
 			RefreshButtons();
-			naming.Active = false;
+			naming.Close();
 		}
 		catch ( Exception error ) when ( error is IOException or UnauthorizedAccessException )
 		{
@@ -83,7 +83,7 @@ internal sealed class LobbyPlayerPanel : Panel
 				// A published profile remains a valid occupied slot even if binding its next page fails.
 				flow.Reload( store.ReadSlots() );
 				RefreshButtons();
-				naming.Active = false;
+				naming.Close();
 				failure.Text = error.Message;
 			}
 			else naming.ShowError( error.Message );
@@ -104,7 +104,7 @@ internal sealed class LobbyPlayerPanel : Panel
 	internal void Cancel()
 	{
 		flow.Cancel();
-		naming.Active = false;
+		naming.Close();
 		level.Advisor?.Cancel();
 	}
 	public void Back()
