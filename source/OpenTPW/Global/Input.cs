@@ -95,6 +95,8 @@ public static partial class Input
 #if DEBUG
 	/// <summary>Window position the acceptance run hovers over instead of the system mouse; the OS cursor is never moved.</summary>
 	internal static Vector2? PointerOverride { get; set; }
+	/// <summary>One simulated left click for the acceptance run, consumed by the next input update.</summary>
+	internal static bool ClickOverride { get; set; }
 #endif
 
 	public static void UpdateFrom( InputSnapshot inputSnapshot )
@@ -117,6 +119,9 @@ public static partial class Input
 
 		// A press and release may both arrive between frames; retain the event even when polling is up.
 		LeftPressed = inputSnapshot.MouseEvents.Any( mouse => mouse.MouseButton == MouseButton.Left && mouse.Down ) || mouseInfo.Left && !Mouse.Left;
+#if DEBUG
+		if ( ClickOverride ) { LeftPressed = true; ClickOverride = false; }
+#endif
 		Mouse = mouseInfo;
 		Text = new string( inputSnapshot.KeyCharPresses.ToArray() );
 		// Retain key-down events even when a short press is released in the same snapshot.

@@ -70,7 +70,12 @@ internal sealed class LobbyAcceptance
 				else { Check( navigation.Island.Id == level.Lobby!.Islands[0].Id, "four-island navigation wraps" ); Next( 2 ); }
 				break;
 			case 2 when elapsed > 1:
-				Check( navigation.Enter(), "affordable island accepts entry" );
+				// Enter through the real pointer path: hover the gate button (0x1e0e8) and click it.
+				Check( navigation.CanEnter, "affordable island can be entered" );
+				Hover( (68 + 221) / 2f, (1114 + 1267) / 2f ); Input.ClickOverride = true; Next( 34 ); break;
+			case 34 when elapsed > 0.3:
+				Input.PointerOverride = null;
+				Check( navigation.Entering, "clicking the island gate button starts entry" );
 				Check( navigation.CancelEntry() && opened == 0 && closed == 0 &&
 					LobbyCameraMode.Movement == LobbyCameraState.Movement.Orbiting, "alignment cancellation leaves the gate closed" );
 				Next( 3 ); break;
