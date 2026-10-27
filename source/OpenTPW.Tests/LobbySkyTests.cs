@@ -101,4 +101,20 @@ public class LobbySkyTests
 		Assert.AreEqual( -0.01f, after[0].TexCoords.X, 0.000001f );
 		Assert.AreEqual( 0.001125f, after[0].TexCoords.Y, 0.000001f );
 	}
+
+	[TestMethod]
+	public void CloudLayersAboveTheFirstShareOneRandomGreyPerVertex()
+	{
+		GameData.Require();
+		var sky = LobbySkyGeometry.Load();
+		var one = sky.CloudVertices( 1 );
+		for ( int i = 0; i < one.Length; i++ )
+		{
+			var grey = one[i].Normal;
+			Assert.AreEqual( grey.X, grey.Y ); Assert.AreEqual( grey.X, grey.Z );
+			Assert.IsTrue( grey.X >= 0x80 / 255f && grey.X <= 1, $"vertex {i}: {grey.X}" );
+			Assert.AreEqual( grey, sky.CloudVertices( 2 )[i].Normal );
+			Assert.AreEqual( grey, sky.CloudVertices( 3 )[i].Normal );
+		}
+	}
 }

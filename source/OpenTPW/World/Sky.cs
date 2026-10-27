@@ -3,7 +3,8 @@ using StbImageSharp;
 namespace OpenTPW;
 
 /// <summary>
-/// Lobby sky. 0x5d3c20 -> 0x581820 always loads the fantasy sky.tga/sky_rgb.tga/sky_cyl.tga, for every island.
+/// Lobby sky. 0x5d3c20 -> 0x581820 always loads the fantasy sky.tga/sky_rgb.tga/sky_cyl.tga, for every island
+/// (sky_rgb only feeds a colour table that the grid builder overwrites, see LobbySkyGeometry).
 /// SKYQUALITY 0/1/2/4 is the cloud layer count (0x44cc60 -> 0x581c80); 0 draws neither clouds nor horizon.
 /// </summary>
 public class Sky : ModelEntity
@@ -132,16 +133,18 @@ internal sealed class LobbySkyGeometry
 {
 	internal const string Root = "levels/fantasy/sky/";
 	private const float Span = 2400, Height = 180, Radius = 720, RimHeight = 36;
-	private readonly byte[] rgb;
-	private readonly int rgbWidth;
-	private readonly int rgbHeight;
+	/// <summary>
+	/// Per-vertex grey of every cloud layer. US 0x585720 (TW 0x581460), which builds the cloud grid, writes
+	/// (rand() &amp; 0x7f) | 0x80 to all channels of the same vertex in all four layer tables (+0xf60/+0x1360/+0x1760/
+	/// +0x1b60), after 0x582250 filled them from sky_rgb.tga, so sky_rgb never reaches the screen. Layer zero is
+	/// then replaced by the island colour (0x5d4790). A new set is drawn each time the sky is built.
+	/// </summary>
+	private readonly byte[] greys = new byte[256];
 	private readonly Vector2[] offsets = new Vector2[4];
 	internal uint[] CloudIndices { get; }
-	private LobbySkyGeometry( ImageResult image )
+	private LobbySkyGeometry( Random random )
 	{
-		rgb = image.Data;
-		rgbWidth = image.Width;
-		rgbHeight = image.Height;
+		for ( int i = 0; i < greys.Length; i++ ) greys[i] = (byte)(0x80 | random.Next( 0x80 ));
 		var vertices = CloudVertices( 0 );
 		var indices = new List<uint>();
 		for ( uint x = 0; x < 15; x++ )
@@ -160,7 +163,7 @@ internal sealed class LobbySkyGeometry
 	}
 	internal static LobbySkyGeometry Load()
 	{
-		return new LobbySkyGeometry( ReadTexture( "sky_rgb.tga" ) );
+		return new LobbySkyGeometry( new Random() );
 	}
 	internal static ImageResult ReadTexture( string name )
 	{
@@ -184,8 +187,7 @@ internal sealed class LobbySkyGeometry
 			for ( int z = 0; z < 16; z++ )
 			{
 				float px = x * Span / 15 - Span * 0.5f, pz = z * Span / 15 - Span * 0.5f;
-				int pixel = ((rgbHeight / 32 + z * (rgbHeight / 16)) * rgbWidth + rgbWidth / 32 + x * (rgbWidth / 16)) * 4;
-				var tint = new Vector3( rgb[pixel] / 255f, rgb[pixel + 1] / 255f, rgb[pixel + 2] / 255f );
+				var tint = new Vector3( greys[x * 16 + z] / 255f );
 				if ( layer == 0 && layerZeroColour.HasValue ) tint = layerZeroColour.Value;
 				float u = x * step + offsets[layer].X, v = z * step + offsets[layer].Y;
 				// 0x582930 negates and cycles the U/V scale coefficients between layers.
