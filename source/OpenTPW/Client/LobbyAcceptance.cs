@@ -42,6 +42,25 @@ internal sealed class LobbyAcceptance
 				if ( slot < 0 ) throw new InvalidOperationException( "Lobby acceptance needs an existing test profile" );
 				level.PlayerMenu!.Select( slot );
 				Check( navigation.Active && level.IslandMenu!.Active, "existing profile opens island page" );
+				Next( navigation.InstantAction ? 40 : 1 ); break;
+			case 40 when elapsed > 3:
+				// US 0x4b9340: GameType 2 (Instant Action) fixes the island, hides keys and allows entry without them.
+				int island = navigation.Island.Id;
+				navigation.Navigate( 1 ); navigation.Navigate( -1 );
+				Check( navigation.Island.Id == island && navigation.CanEnter, "Instant Action keeps the island fixed and enterable" );
+				Capture( "lobby-instant-island" ); Hover( (68 + 221) / 2f, (1114 + 1267) / 2f ); Next( 41 ); break;
+			case 41 when elapsed > 0.3:
+				Capture( "lobby-island-help" );
+				Check( level.Help?.Shown == 345, "hovering the island enter button shows UIHELPTEXT 345" );
+				Hover( (97 + 250) / 2f, (1299 + 1453) / 2f ); Next( 42 ); break;
+			case 42 when elapsed > 0.3:
+				Check( level.Help?.Shown == -1, "a disabled Instant Action arrow shows no help" );
+				Input.PointerOverride = null;
+				// Continue the key and navigation checks with an in-memory Full Simulation copy; nothing is written.
+				var simulation = PlayerProfileFile.Read( level.PlayerMenu!.Profile!.Write() );
+				simulation.Prefix[14] = 0;
+				navigation.Bind( simulation ); level.IslandMenu!.Activate();
+				Check( !navigation.InstantAction, "Full Simulation copy restores key gates" );
 				Next( 1 ); break;
 			case 1 when elapsed > 3:
 				Capture( $"lobby-{navigation.Island.ThemeName}" );

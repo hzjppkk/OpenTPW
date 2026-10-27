@@ -15,7 +15,13 @@ public sealed class LobbyNavigation
 	public int Keys => profile == null ? 0 : LobbyPlayerProgress.KeyCount( profile, config.Islands.Select( island => island.ThemeName ) );
 	/// <summary>Keys needed to enter the current island: <c>Keys.CostToEnter</c> from the theme's global.sam (1..5).</summary>
 	public int RequiredKeys => costs[Island.Id];
-	public bool CanEnter => Active && !Entering && Keys >= RequiredKeys;
+	/// <summary>
+	/// Retail GameType 2 (US 0x550100 selects it when the profile's creation-mode byte +0x24, gms.dat prefix
+	/// byte 14, is non-zero, i.e. Instant Action). The island page then hides the keys and disables the arrows
+	/// (US 0x4b9340), next/previous return early (US 0x5e1ee0, 0x5e1f40) and entry skips the key check (US 0x5e1cc0).
+	/// </summary>
+	public bool InstantAction => profile != null && profile.CreationMode != 0;
+	public bool CanEnter => Active && !Entering && (InstantAction || Keys >= RequiredKeys);
 	public event Action<int>? IslandSelected;
 	public event Action? EntryRequested;
 	public event Action? EntryCancelled;
@@ -41,12 +47,12 @@ public sealed class LobbyNavigation
 	/// <summary>Moves to the previous (-1, 0x5dc6e0) or next (+1, 0x5dc5f0) island, wrapping at both ends.</summary>
 	public void Navigate( int direction )
 	{
-		if ( !Active || Entering ) return;
+		if ( !Active || Entering || InstantAction ) return;
 		// Normalize negative modulo as well: the previous-island control wraps at index zero.
 		index = ((index + direction) % config.Islands.Count + config.Islands.Count) % config.Islands.Count;
 		IslandSelected?.Invoke( Island.Id );
 	}
-	/// <summary>Starts the entry flight when enough keys are held; the gate opens once the camera is aligned.</summary>
+	/// <summary>Starts the entry flight when enough keys are held (or in Instant Action); the gate opens once the camera is aligned.</summary>
 	public bool Enter()
 	{
 		// Lock selection before notifying the camera so repeated input cannot queue two entries.
