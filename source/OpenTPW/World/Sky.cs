@@ -60,13 +60,19 @@ public class Sky : ModelEntity
 		geometry = LobbySkyGeometry.Load();
 		var cloudImage = LobbySkyGeometry.ReadTexture( "sky.tga" );
 		var cloudTexture = new Texture( cloudImage.Data, cloudImage.Width, cloudImage.Height, TextureFlags.Wrap );
-		for ( int layer = 0; layer < 4; layer++ )
+		// 0x582930 submits layers 0..n-1 with the same sort key (0x561ee0: 1e8 plus the mean vertex depth, and all
+		// layers share one grid), and layer zero ends up drawn last: stable US captures show only layer zero's
+		// colour over the background (e.g. fantasy 0.81 × (255,170,255) + 0.19 × 0x44ddff = (219,180,255)).
+		// Entities draw in creation order, so create the layers in reverse.
+		var parts = new SkyPart[4];
+		for ( int layer = 3; layer >= 0; layer-- )
 		{
 			var cloudMaterial = new Material<ObjectUniformBuffer>( "content/shaders/lobby-sky.shader", MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
 			cloudMaterial.Set( "Color", cloudTexture );
 			int index = layer;
-			clouds.Add( new SkyPart { Enabled = () => index < quality.SkyLayers, Model = new Model( geometry.CloudVertices( layer ), geometry.CloudIndices, cloudMaterial ) } );
+			parts[layer] = new SkyPart { Enabled = () => index < quality.SkyLayers, Model = new Model( geometry.CloudVertices( layer ), geometry.CloudIndices, cloudMaterial ) };
 		}
+		clouds.AddRange( parts );
 		var horizonImage = LobbySkyGeometry.ReadTexture( "sky_cyl.tga" );
 		var horizonMaterial = new Material<ObjectUniformBuffer>( "content/shaders/lobby-sky.shader", MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
 		horizonMaterial.Set( "Color", new Texture( horizonImage.Data, horizonImage.Width, horizonImage.Height, TextureFlags.Wrap ) );
