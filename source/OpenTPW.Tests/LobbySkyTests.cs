@@ -127,9 +127,30 @@ public class LobbySkyTests
 		sky.Replay( offsets, greys );
 		// Layer 3 keeps both coefficients positive (0x5863c0), so vertex (0,0) carries the raw offsets.
 		Assert.AreEqual( new Vector2( 0.25f, 0.5f ), sky.CloudVertices( 3 )[0].TexCoords );
-		Assert.AreEqual( new Vector3( (0x80 | 37) / 255f ), sky.CloudVertices( 2 )[37].Normal );
+		Assert.AreEqual( new Vector3( (0x80 | 82) / 255f ), sky.CloudVertices( 2 )[37].Normal );
 		greys[3][5] ^= 1;
 		Assert.ThrowsException<System.IO.InvalidDataException>( () => sky.Replay( offsets, greys ) );
 		Assert.ThrowsException<System.IO.InvalidDataException>( () => sky.Replay( offsets.Take( 3 ).ToArray(), greys ) );
+	}
+
+	[TestMethod]
+	public void CloudUvAndGreyRowsFollowTheRetailTransposedWalk()
+	{
+		GameData.Require();
+		var sky = LobbySkyGeometry.Load();
+		var greys = Enumerable.Range( 0, 4 ).Select( _ => Enumerable.Range( 0, 256 ).ToArray() ).ToArray();
+		sky.Replay( new[] { new[] { 0.1f, 0.2f }, new[] { 0.3f, 0.4f }, new[] { 0.5f, 0.6f }, new[] { 0.25f, 0.5f } }, greys );
+		// US 0x5863c0 at grid position X=2,Z=5: U uses 5, V uses 2, colour reads table entry 5*16+2.
+		var expected = new[] { new Vector2( -1.0817477f, 0.5926991f ), new Vector2( -1.1414981f, -0.7365992f ),
+			new Vector2( 1.2012484f, -0.8804994f ), new Vector2( 0.8109987f, 0.7243995f ) };
+		for ( int layer = 0; layer < 4; layer++ )
+		{
+			var vertex = sky.CloudVertices( layer )[37];
+			Assert.AreEqual( -880f, vertex.Position.X );
+			Assert.AreEqual( -400f, vertex.Position.Y );
+			Assert.IsTrue( (vertex.TexCoords - expected[layer]).Length < 0.00001f, $"Layer {layer}: {vertex.TexCoords}" );
+			Assert.AreEqual( new Vector3( 82 / 255f ), vertex.Normal );
+			Assert.AreEqual( new Vector3( 37 / 255f ), sky.CloudVertices( layer )[82].Normal );
+		}
 	}
 }

@@ -61,12 +61,11 @@ public class Sky : ModelEntity
 		geometry = LobbySkyGeometry.Load();
 		var cloudImage = LobbySkyGeometry.ReadTexture( "sky.tga" );
 		var cloudTexture = new Texture( cloudImage.Data, cloudImage.Width, cloudImage.Height, TextureFlags.Wrap );
-		// 0x582930 submits layers 0..n-1 with the same sort key (0x561ee0: 1e8 plus the mean vertex depth, and all
-		// layers share one grid), and layer zero ends up drawn last: stable US captures show only layer zero's
-		// colour over the background (e.g. fantasy 0.81 × (255,170,255) + 0.19 × 0x44ddff = (219,180,255)).
-		// Entities draw in creation order, so create the layers in reverse.
+		// US 0x5863c0 submits layers 0..n-1. Their flags include 0x1000, which matches the D3D
+		// renderer's immediate mask 0x3000 (0x5667d0). 0x565590 draws them immediately and marks the batches
+		// already drawn, so the later depth sort never reverses these layers. Entities keep creation order.
 		var parts = new SkyPart[4];
-		for ( int layer = 3; layer >= 0; layer-- )
+		for ( int layer = 0; layer < 4; layer++ )
 		{
 			var cloudMaterial = new Material<ObjectUniformBuffer>( "content/shaders/lobby-sky.shader", MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
 			cloudMaterial.Set( "Color", cloudTexture );
@@ -143,16 +142,16 @@ internal sealed class LobbySkyColour
 	}
 }
 
-/// <summary>Geometry and UV rules from 0x581460 / 0x581c90 / 0x582930.</summary>
+/// <summary>Geometry and UV rules from US 0x584ef0 / 0x585720 / 0x5863c0.</summary>
 internal sealed class LobbySkyGeometry
 {
 	internal const string Root = "levels/fantasy/sky/";
 	private const float Span = 2400, Height = 180, Radius = 720, RimHeight = 36;
 	/// <summary>
-	/// Per-vertex grey of every cloud layer. US 0x585720 (TW 0x581460), which builds the cloud grid, writes
+	/// Per-vertex grey of every cloud layer. US 0x585720, which builds the cloud grid, writes
 	/// (rand() &amp; 0x7f) | 0x80 to all channels of the same vertex in all four layer tables (+0xf60/+0x1360/+0x1760/
-	/// +0x1b60), after 0x582250 filled them from sky_rgb.tga, so sky_rgb never reaches the screen. Layer zero is
-	/// then replaced by the island colour (0x5d4790). A new set is drawn each time the sky is built.
+	/// +0x1b60), after 0x585ce0 filled them from sky_rgb.tga, so sky_rgb never reaches the screen. Layer zero is
+	/// then replaced by the island colour (0x5d96c0). A new set is drawn each time the sky is built.
 	/// </summary>
 	private readonly byte[] greys = new byte[256];
 	private readonly Vector2[] offsets = new Vector2[4];
@@ -209,6 +208,10 @@ internal sealed class LobbySkyGeometry
 		for ( int layer = 0; layer < 4; layer++ ) offsets[layer] = new Vector2( retailOffsets[layer][0], retailOffsets[layer][1] );
 		for ( int i = 0; i < greys.Length; i++ ) greys[i] = (byte)retailGreys[1][i];
 	}
+	/// <summary>
+	/// US 0x585720 stores positions at x*16+z. US 0x5863c0 walks that array linearly, but computes U
+	/// from the inner Z index and V from the outer X index, reading colours at z*16+x (0x58670f).
+	/// </summary>
 	internal Vertex[] CloudVertices( int layer, float flash = 0, Vector3? layerZeroColour = null )
 	{
 		var vertices = new Vertex[256];
@@ -217,10 +220,10 @@ internal sealed class LobbySkyGeometry
 			for ( int z = 0; z < 16; z++ )
 			{
 				float px = x * Span / 15 - Span * 0.5f, pz = z * Span / 15 - Span * 0.5f;
-				var tint = new Vector3( greys[x * 16 + z] / 255f );
+				var tint = new Vector3( greys[z * 16 + x] / 255f );
 				if ( layer == 0 && layerZeroColour.HasValue ) tint = layerZeroColour.Value;
-				float u = x * step + offsets[layer].X, v = z * step + offsets[layer].Y;
-				// 0x582930 negates and cycles the U/V scale coefficients between layers.
+				float u = z * step + offsets[layer].X, v = x * step + offsets[layer].Y;
+				// US 0x5863c0 negates and cycles the U/V scale coefficients between layers.
 				if ( layer is 0 or 1 ) u = -u;
 				if ( layer is 1 or 2 ) v = -v;
 				vertices[x * 16 + z] = new Vertex( new Vector3( px, pz, Height - MathF.Sqrt( px * px + pz * pz ) * 0.2f ),
