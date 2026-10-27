@@ -81,10 +81,15 @@ internal sealed class LobbyAcceptance
 				Next( 3 ); break;
 			case 3 when elapsed > 1:
 				// Retail also enters when a left press lands on the scene rather than a page element (0x5e2310).
-				Hover( 1024, 700 ); Input.ClickOverride = true; Next( 35 ); break;
+				// The title text element (0x1e0ef) takes the press, so it must not start entry.
+				Hover( 1024, 1370 ); Input.ClickOverride = true; Next( 36 ); break;
+			case 36 when elapsed > 0.3:
+				Check( !navigation.Entering, "clicking the island title does not enter" );
+				// Inside the panel's bounding box but outside its L-shaped hit outline: the lobby view gets the press.
+				Hover( 400, 1000 ); Input.ClickOverride = true; Next( 35 ); break;
 			case 35 when elapsed > 0.3:
 				Input.PointerOverride = null;
-				Check( navigation.Entering, "clicking the scene restarts entry after cancellation" ); Next( 4 ); break;
+				Check( navigation.Entering, "clicking the scene beside the panel outline restarts entry" ); Next( 4 ); break;
 			case 4 when LobbyCameraMode.Movement == LobbyCameraState.Movement.Entering:
 				// Cancel in the update that actually dispatched M1, while its non-looping segment is unfinished.
 				Check( opened == 1 && navigation.CancelEntry() && closed == 1, "opened gate dispatches one close request" );

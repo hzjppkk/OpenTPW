@@ -75,15 +75,51 @@ internal sealed class LobbyIslandPanel : Panel
 		else if ( Click( GlobeBox ) ) GlobeRequested?.Invoke();
 		// US 0x658af1 posts a left press as message 0x10005 (button 0); when no page element takes it, the lobby
 		// controller's handler 0x5e2310 calls its enter method 0x5e1cc0, the same key/GameType check as the gate.
-		// Which elements take the press is inferred: the page's model elements (panel, buttons, key, cost, count).
-		else if ( Input.LeftPressed && !pageElements.Any( LobbyNamingPanel.Hit ) ) { Failure = ""; navigation.Enter(); }
+		else if ( Input.LeftPressed && !PageTakesPointer() ) { Failure = ""; navigation.Enter(); }
 	}
-	private static readonly Rectangle[] pageElements =
-		[Box( 28, 855, 476, 1521 ), Box( 554, 170, 990, 437 ), Box( 1045, 191, 1405, 416 ), Box( 1688, 68, 1963, 186 )];
+	/// <summary>
+	/// L-shaped hit polygon of the island panel 0x1e0e7 (table 0x757f60, opcode 4 subtype 4 after the title's end).
+	/// </summary>
+	private static readonly System.Numerics.Vector2[] panelOutline =
+	[
+		new( 29, 1003 ), new( 29, 1364 ), new( 45, 1432 ), new( 87, 1486 ), new( 153, 1513 ), new( 254, 1521 ),
+		new( 353, 1513 ), new( 419, 1485 ), new( 461, 1433 ), new( 476, 1376 ), new( 459, 1316 ), new( 417, 1268 ),
+		new( 356, 1242 ), new( 265, 1236 ), new( 263, 961 ), new( 245, 906 ), new( 203, 869 ), new( 157, 855 ),
+		new( 110, 860 ), new( 87, 867 ), new( 66, 882 ), new( 46, 907 ), new( 33, 944 ),
+	];
+	private static readonly Rectangle TitleBox = Box( 477, 1303, 1571, 1437 ), KeyBox = Box( 554, 170, 990, 437 ),
+		CostBox = Box( 1045, 191, 1405, 416 ), CountGroupBox = Box( 1688, 68, 1963, 186 );
+	/// <summary>
+	/// Whether a page element would receive the pointer instead of the lobby view. The UI hit test US 0x65db25
+	/// skips elements that are hidden (+0x48 bit 0), disabled (+0x48 bit 1, set by 0x65da8d) or detached (+4), and
+	/// otherwise takes any element whose shape (+0x44) contains the point. The panel's shape is its outline polygon and
+	/// its children (buttons, key, cost, count group, title text) use their rectangles; the buttons lie inside the
+	/// outline. The advisor is an engine model, not a UI element, so it never blocks.
+	/// </summary>
+	private bool PageTakesPointer()
+	{
+		var mouse = Input.Mouse.Position;
+		var point = new System.Numerics.Vector2( mouse.X * 2048 / Screen.Size.X, mouse.Y * 1536 / Screen.Size.Y );
+		if ( Inside( point, panelOutline ) || LobbyNamingPanel.Hit( TitleBox ) ) return true;
+		if ( navigation.InstantAction ) return false;
+		return LobbyNamingPanel.Hit( KeyBox ) || LobbyNamingPanel.Hit( CostBox ) || navigation.Keys > 0 && LobbyNamingPanel.Hit( CountGroupBox );
+	}
+	/// <summary>Even-odd point-in-polygon test in UI units.</summary>
+	private static bool Inside( System.Numerics.Vector2 point, System.Numerics.Vector2[] outline )
+	{
+		bool inside = false;
+		for ( int i = 0, j = outline.Length - 1; i < outline.Length; j = i++ )
+		{
+			var a = outline[i]; var b = outline[j];
+			if ( (a.Y > point.Y) != (b.Y > point.Y) && point.X < (b.X - a.X) * (point.Y - a.Y) / (b.Y - a.Y) + a.X ) inside = !inside;
+		}
+		return inside;
+	}
 	/// <summary>
 	/// Shows the hovered element's help and, on its first help since activation, places MessageTag1 at its centre
-	/// (0x48b9f0 event 0x11). A disabled arrow is treated as not hovered (inferred: retail disabled elements are
-	/// skipped by hit testing; not yet compared with the original).
+	/// (0x48b9f0 event 0x11). Mouse-enter 0x10001 (US 0x6589b4), which the default handler 0x65f9fb turns into help,
+	/// only goes to the element the hit test 0x65db25 returns; that test skips disabled elements, so a disabled arrow
+	/// leaves the pointer on the panel behind it, whose help is −1.
 	/// </summary>
 	private void UpdateHelp( bool arrows )
 	{

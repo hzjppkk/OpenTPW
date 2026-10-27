@@ -24,9 +24,11 @@ internal sealed class LobbyUiText : Panel
 	/// </summary>
 	public bool Shadow { get; set; }
 	/// <summary>
-	/// Break lines at spaces to fit the rectangle width. Inferred from US 0x65c4b9(1, 1) (text control message
-	/// 0x3000): in the lobby only the confirmation message (0x47f0af) and the help strip (0x492233) send it, and
-	/// both rectangles are sized for several lines; the retail wrapping routine itself has not been located.
+	/// Lay the text out within the rectangle width. US 0x65c4b9(1, 1) sends text message 0x3000, which the text element
+	/// handler 0x48fc40 stores at +0xda/+0xdb; the element draw 0x48f830 then passes its own width to the layout instead
+	/// of the unlimited 0x4000 used when +0xda is 0. The confirmation message (0x47f0af) and the help strip (0x492233)
+	/// set it. The layout engine's break rule (0x6aeb10, per-glyph flags) has not been traced, so lines break at spaces
+	/// and an over-long word keeps its own clipped line.
 	/// </summary>
 	public bool WordWrap { get; set; }
 
