@@ -38,7 +38,9 @@ internal sealed class LobbyAdvisorPanel : Panel
 				string name = mesh.Materials[m].Name?.TrimEnd( '\0' ) ?? throw new InvalidDataException( "Advisor material has no texture" );
 				if ( !textures.TryGetValue( name, out var texture ) )
 					textures.Add( name, texture = new Texture( AnimationFiles.ResolveFile( $"global/advisor/textures/{name}.wct", "Advisor texture" ) ) );
-				var material = new Material<ObjectUniformBuffer>( shader, MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
+				// Retail never culls in hardware (US 0x5668e1 sets CULLMODE 1) but drops back faces in software: 0x580530
+				// emits a face only when 0x581320 finds a positive screen-space winding of its three transformed vertices.
+				var material = new Material<ObjectUniformBuffer>( shader, MaterialFlags.DisableDepth );
 				material.Set( "Color", texture );
 				var vertices = new Vertex[mesh.Vertices.Length];
 				parts.Add( new( meshIndex, new Model( vertices, indices.ToArray(), material ), vertices ) );

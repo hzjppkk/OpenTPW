@@ -91,7 +91,9 @@ internal class PurpleButton : Panel
 					?? throw new InvalidDataException( "Lobby button material has no texture" );
 				if ( !barTextures.TryGetValue( name, out var texture ) )
 					barTextures[name] = texture = new Texture( AnimationFiles.ResolveFile( $"ui/textures/{name}.wct", "Lobby button texture" ), TextureFlags.PointFilter );
-				var material = new Material<ObjectUniformBuffer>( barShader, MaterialFlags.DisableDepth | MaterialFlags.DisableCulling );
+				// Retail never culls in hardware (US 0x5668e1 sets CULLMODE 1) but drops back faces in software: 0x580530
+				// emits a face only when 0x581320 finds a positive screen-space winding of its three transformed vertices.
+				var material = new Material<ObjectUniformBuffer>( barShader, MaterialFlags.DisableDepth );
 				material.Set( "Color", texture );
 				bars.Add( new Model( vertices, indices.ToArray(), material ) );
 			}
