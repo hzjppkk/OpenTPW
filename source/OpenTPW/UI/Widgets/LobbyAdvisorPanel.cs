@@ -55,7 +55,8 @@ internal sealed class LobbyAdvisorPanel : Panel
 		var pose = advisor.Geometry.Pose( advisor.Animation, advisor.Frame );
 		// LIGHTING=0 leaves vertices white like the scene models (0x44ce66).
 		bool lit = LobbyQuality.Load().LightingEnabled;
-		var ambient = (Level.Current?.Lighting ?? LobbyLighting.Islands).Ambient;
+		var lighting = Level.Current?.Lighting ?? LobbyLighting.Islands;
+		var scene = LobbyLighting.RetailDirection;
 		foreach ( var part in parts )
 		{
 			// Mouth meshes are selected by LIP state; all other nodes follow segment hiding.
@@ -66,7 +67,8 @@ internal sealed class LobbyAdvisorPanel : Panel
 			{
 				var source = pose.Positions[index]?[i] ?? mesh.Vertices[i].Position;
 				var point = System.Numerics.Vector3.Transform( source.GetSystemVector3(), pose.WorldTransforms[index] );
-				var colour = lit ? LobbyAdvisorGeometry.Colour( ambient, pose.WorldTransforms[index], mesh.Normals[i].GetSystemVector3() ) : System.Numerics.Vector3.One;
+				var colour = lit ? LobbyAdvisorGeometry.Colour( lighting.Ambient, pose.WorldTransforms[index],
+					mesh.Normals[i].GetSystemVector3(), scene, lighting.Diffuse ) : System.Numerics.Vector3.One;
 				part.Vertices[i] = new Vertex( LobbyAdvisorGeometry.Project( point ), pose.TexCoords[index]?[i] ?? mesh.TexCoords[i] )
 					{ Normal = new Vector3( colour.X, colour.Y, colour.Z ) };
 			}

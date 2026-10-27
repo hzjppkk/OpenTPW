@@ -153,7 +153,22 @@ public class LobbyAdvisorPlaybackTests
 		var ambient = new System.Numerics.Vector3( 0x44 / 255f );
 		var node = System.Numerics.Matrix4x4.CreateScale( 0.01125f, 0.001f, 0.015f );
 		// The light travels into the screen (+Z), so a normal pointing out of it (−Z) is fully lit.
-		Assert.AreEqual( System.Numerics.Vector3.One, LobbyAdvisorGeometry.Colour( ambient, node, -System.Numerics.Vector3.UnitZ ) );
-		Assert.AreEqual( ambient, LobbyAdvisorGeometry.Colour( ambient, node, System.Numerics.Vector3.UnitZ ) );
+		var dark = System.Numerics.Vector3.Zero;
+		Assert.AreEqual( System.Numerics.Vector3.One, LobbyAdvisorGeometry.Colour( ambient, node, -System.Numerics.Vector3.UnitZ, System.Numerics.Vector3.UnitX, dark ) );
+		Assert.AreEqual( ambient, LobbyAdvisorGeometry.Colour( ambient, node, System.Numerics.Vector3.UnitZ, System.Numerics.Vector3.UnitX, dark ) );
+	}
+
+	[TestMethod]
+	public void LobbyCameraLightAlsoReachesFacesTurnedAwayFromTheAdvisorLight()
+	{
+		var ambient = new System.Numerics.Vector3( 0x44 / 255f );
+		var diffuse = new System.Numerics.Vector3( 0xee / 255f * 0.5f );
+		var node = System.Numerics.Matrix4x4.CreateScale( 0.01125f, 0.001f, 0.015f );
+		// A face pointing into the screen gets nothing from the advisor light but all of a scene light travelling
+		// out of the screen (−Z), even through the advisor's non-uniform root scale.
+		var colour = LobbyAdvisorGeometry.Colour( ambient, node, System.Numerics.Vector3.UnitZ, -System.Numerics.Vector3.UnitZ, diffuse );
+		Assert.AreEqual( ambient.X + diffuse.X, colour.X, 1e-5f );
+		// A scene light behind the face adds nothing.
+		Assert.AreEqual( ambient, LobbyAdvisorGeometry.Colour( ambient, node, System.Numerics.Vector3.UnitZ, System.Numerics.Vector3.UnitZ, diffuse ) );
 	}
 }

@@ -29,6 +29,8 @@ internal sealed class LobbyLighting
 
 	/// <summary>The light's travel direction in OpenTPW world axes, updated with the camera.</summary>
 	internal static N.Vector3 WorldDirection { get; private set; } = N.Vector3.UnitX;
+	/// <summary>The same direction in retail axes (Y up), as stored in the light's +0x2c.</summary>
+	internal static N.Vector3 RetailDirection => ToRetail( WorldDirection );
 
 	internal LobbyLighting( uint ambient, uint diffuse, float upOffset, float rightOffset, bool flatten )
 	{
