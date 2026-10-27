@@ -18,6 +18,15 @@ internal sealed class LobbyConfirmPanel : Panel
 	private static readonly Rectangle CancelBox = LobbyNamingPanel.Box( 1387, 610, 1470, 694 ),
 		OkayBox = LobbyNamingPanel.Box( 1379, 522, 1462, 605 );
 	public bool Active => confirm != null;
+	/// <summary>Whether the wrapped message fits the 735×477-unit text rectangle (acceptance check).</summary>
+	internal bool MessageFits
+	{
+		get
+		{
+			var lines = message.Lines( message.Text );
+			return lines.All( line => message.Measure( line ) <= (1345 - 610) / 3.2f ) && lines.Length * message.LineHeight <= (753 - 276) / 3.2f;
+		}
+	}
 	public LobbyConfirmPanel( RootPanel hud )
 	{
 		this.hud = hud;
@@ -25,7 +34,7 @@ internal sealed class LobbyConfirmPanel : Panel
 		background = new LobbyUiModel( LobbyControlResources.ResolveModel( 0xd8cca935 ), LobbyNamingPanel.Box( 500, 233, 1516, 830 ) );
 		cancel = new LobbyUiModel( "b_exit", CancelBox );
 		okay = new LobbyUiModel( "b_okay", OkayBox );
-		message = new LobbyUiText( "", LobbyNamingPanel.Box( 610, 276, 1345, 753 ), LobbyFonts.Name( 4 ) );
+		message = new LobbyUiText( "", LobbyNamingPanel.Box( 610, 276, 1345, 753 ), LobbyFonts.Name( 4 ) ) { WordWrap = true };
 	}
 	public void Show( string text, Action accepted )
 	{

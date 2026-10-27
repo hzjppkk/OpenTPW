@@ -115,6 +115,7 @@ internal sealed class LobbyAcceptance
 				Input.PointerOverride = null; level.Menu!.Choose( UIStrings.QuitGame ); Next( 15 ); break;
 			case 15 when elapsed > 0.5:
 				// Confirmation table US 0x74f920: every element has help -1.
+				Check( Confirmation.MessageFits, "quit confirmation text wraps inside its box" );
 				Capture( "lobby-quit-cancel" ); Hover( (1379 + 1462) / 2f, (522 + 605) / 2f ); Next( 33 ); break;
 			case 33 when elapsed > 0.3:
 				Capture( "lobby-quit-hover" );

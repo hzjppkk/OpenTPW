@@ -21,7 +21,7 @@ internal sealed class LobbyHelpBar : Panel
 		float height = text.LineHeight * 3.2f * 2 + 10;
 		var bounds = LobbyNamingPanel.Box( 574, 1520 - height, 1474, 1520 );
 		background = new LobbyUiModel( "f_helpbg", bounds );
-		text = new LobbyUiText( "", bounds, LobbyFonts.Name( 7 ) );
+		text = new LobbyUiText( "", bounds, LobbyFonts.Name( 7 ) ) { WordWrap = true };
 	}
 
 	/// <summary>UIHELPTEXT entry currently shown, or −1 when hidden.</summary>

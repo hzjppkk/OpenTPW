@@ -23,6 +23,12 @@ internal sealed class LobbyUiText : Panel
 	/// Menu items (0x490cd0) and edit boxes draw without it.
 	/// </summary>
 	public bool Shadow { get; set; }
+	/// <summary>
+	/// Break lines at spaces to fit the rectangle width. Inferred from US 0x65c4b9(1, 1) (text control message
+	/// 0x3000): in the lobby only the confirmation message (0x47f0af) and the help strip (0x492233) send it, and
+	/// both rectangles are sized for several lines; the retail wrapping routine itself has not been located.
+	/// </summary>
+	public bool WordWrap { get; set; }
 
 	// 0x48f950 draws every text element twice: a shadow with texel (0x80, 0x80, 0x80, 0x80) 2 pixels
 	// left and 2 down, then the text with (0xFF, 0xFF, 0xFF, 0xFF); both are tinted by the element colour.
@@ -66,7 +72,7 @@ internal sealed class LobbyUiText : Panel
 	protected override void OnRender()
 	{
 		if ( Text.Length == 0 ) return;
-		var lines = Text.Replace( "\r\n", "\n" ).Replace( '\r', '\n' ).Split( '\n' );
+		var lines = Lines( Text );
 		float top = units.Y / 3.2f + (units.Height / 3.2f - LineHeight * lines.Length) * VerticalAlignment / 2 + Offset.Y;
 		for ( int line = 0; line < lines.Length; line++ ) DrawLine( lines[line], top + line * LineHeight );
 	}
@@ -74,8 +80,29 @@ internal sealed class LobbyUiText : Panel
 	internal void Preload( IEnumerable<string> values )
 	{
 		foreach ( string value in values )
-			foreach ( string line in value.Replace( "\r\n", "\n" ).Replace( '\r', '\n' ).Split( '\n' ) )
+			foreach ( string line in Lines( value ) )
 				if ( line.Length != 0 ) Prepare( line );
+	}
+	/// <summary>Explicit lines, each split further at spaces when <see cref="WordWrap"/> is on.</summary>
+	internal string[] Lines( string text )
+	{
+		var explicitLines = text.Replace( "\r\n", "\n" ).Replace( '\r', '\n' ).Split( '\n' );
+		if ( !WordWrap ) return explicitLines;
+		float width = units.Width / 3.2f;
+		var lines = new List<string>();
+		foreach ( string line in explicitLines )
+		{
+			string current = "";
+			foreach ( string word in line.Split( ' ' ) )
+			{
+				string candidate = current.Length == 0 ? word : current + " " + word;
+				// A single word wider than the box keeps its own line and is clipped.
+				if ( current.Length != 0 && font.MeasureString( candidate ) > width ) { lines.Add( current ); current = word; }
+				else current = candidate;
+			}
+			lines.Add( current );
+		}
+		return lines.ToArray();
 	}
 	private Texture Prepare( string text )
 	{
