@@ -117,4 +117,19 @@ public class LobbySkyTests
 			Assert.AreEqual( grey, sky.CloudVertices( 3 )[i].Normal );
 		}
 	}
+	[TestMethod]
+	public void RetailSkyReplaySetsOffsetsAndGreysAndRejectsMismatchedTables()
+	{
+		GameData.Require();
+		var sky = LobbySkyGeometry.Load();
+		var greys = Enumerable.Range( 0, 4 ).Select( _ => Enumerable.Range( 0, 256 ).Select( i => 0x80 | (i & 0x7f) ).ToArray() ).ToArray();
+		var offsets = new[] { new[] { 0.1f, 0.2f }, new[] { 0.3f, 0.4f }, new[] { 0.5f, 0.6f }, new[] { 0.25f, 0.5f } };
+		sky.Replay( offsets, greys );
+		// Layer 3 keeps both coefficients positive (0x5863c0), so vertex (0,0) carries the raw offsets.
+		Assert.AreEqual( new Vector2( 0.25f, 0.5f ), sky.CloudVertices( 3 )[0].TexCoords );
+		Assert.AreEqual( new Vector3( (0x80 | 37) / 255f ), sky.CloudVertices( 2 )[37].Normal );
+		greys[3][5] ^= 1;
+		Assert.ThrowsException<System.IO.InvalidDataException>( () => sky.Replay( offsets, greys ) );
+		Assert.ThrowsException<System.IO.InvalidDataException>( () => sky.Replay( offsets.Take( 3 ).ToArray(), greys ) );
+	}
 }

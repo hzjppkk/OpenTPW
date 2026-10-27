@@ -26,7 +26,14 @@ public sealed class LobbyCameraMode : CameraMode
 	internal static string? FixedViewPath { get; set; }
 	/// <summary>Fixed comparison view in retail Y-up coordinates; vertical FOV in degrees.</summary>
 	private sealed record FixedView( int FormatVersion, string CoordinateSystem, int IslandId,
-		float[] Position, float[] Target, float VerticalFieldOfViewDegrees );
+		float[] Position, float[] Target, float VerticalFieldOfViewDegrees, FixedSky? Sky );
+	/// <summary>
+	/// Optional retail cloud state read from the sky object (US 0x8c1828): layer count +0x2ec8, per-layer U/V
+	/// offsets +0x1fa0/+0x1fa8 + layer × 0xc, and the low byte of each per-vertex colour table +0xf60 + layer × 0x400.
+	/// </summary>
+	internal sealed record FixedSky( int Layers, float[][] Offsets, int[][] Greys );
+	/// <summary>Retail cloud state to replay while a fixed view is active, or null.</summary>
+	internal static FixedSky? FixedViewSky => fixedView?.Sky;
 	public static LobbyIslandConfig CurrentIsland => Config.Islands.First( x => x.Id == SelectedIsland );
 
 	public static void Configure( LobbyConfig config, int island = 0 )

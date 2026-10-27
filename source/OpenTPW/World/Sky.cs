@@ -80,7 +80,22 @@ public class Sky : ModelEntity
 		horizon = new SkyPart { Enabled = () => quality.SkyLayers != 0, Model = new Model( geometry.HorizonVertices(), LobbySkyGeometry.HorizonIndices(), horizonMaterial ) };
 	}
 
-	protected override void OnUpdate() => geometry.Advance( RetailTime.FrameSeconds );
+	private bool replayed;
+	protected override void OnUpdate()
+	{
+		// A fixed comparison view carrying the retail cloud state replays it once and keeps the clouds still,
+		// so the frame matches the retail capture taken while its camera was frozen.
+		if ( LobbyCameraMode.FixedViewSky is { } retail )
+		{
+			if ( replayed ) return;
+			geometry.Replay( retail.Offsets, retail.Greys );
+			if ( retail.Layers != quality.SkyLayers )
+				Log.Warning( $"Fixed view sky has {retail.Layers} retail layers but SKYQUALITY gives {quality.SkyLayers}" );
+			replayed = true;
+			return;
+		}
+		geometry.Advance( RetailTime.FrameSeconds );
+	}
 
 	protected override void OnRender()
 	{
@@ -178,6 +193,21 @@ internal sealed class LobbySkyGeometry
 			offsets[layer] += new Vector2( 0.0008f + layer * 0.0005f, 0.00009f - layer * 0.00003f ) * dt;
 			offsets[layer] = new Vector2( offsets[layer].X % 1, offsets[layer].Y % 1 );
 		}
+	}
+	/// <summary>
+	/// Replaces the scroll offsets and vertex greys with values read from the retail sky object. Retail writes the
+	/// same grey to all four tables and later overwrites layer zero, so layers 1–3 must agree and supply the greys.
+	/// </summary>
+	internal void Replay( float[][] retailOffsets, int[][] retailGreys )
+	{
+		if ( retailOffsets is not { Length: 4 } || retailOffsets.Any( pair => pair is not { Length: 2 } || !float.IsFinite( pair[0] ) || !float.IsFinite( pair[1] ) ) )
+			throw new InvalidDataException( "Retail sky offsets must be four finite U/V pairs" );
+		if ( retailGreys is not { Length: 4 } || retailGreys.Any( table => table is not { Length: 256 } || table.Any( value => value is < 0 or > 255 ) ) )
+			throw new InvalidDataException( "Retail sky greys must be four tables of 256 bytes" );
+		if ( !retailGreys[1].SequenceEqual( retailGreys[2] ) || !retailGreys[1].SequenceEqual( retailGreys[3] ) )
+			throw new InvalidDataException( "Retail sky layers 1-3 have different greys; one grey table cannot replay them" );
+		for ( int layer = 0; layer < 4; layer++ ) offsets[layer] = new Vector2( retailOffsets[layer][0], retailOffsets[layer][1] );
+		for ( int i = 0; i < greys.Length; i++ ) greys[i] = (byte)retailGreys[1][i];
 	}
 	internal Vertex[] CloudVertices( int layer, float flash = 0, Vector3? layerZeroColour = null )
 	{
