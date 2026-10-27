@@ -73,7 +73,13 @@ internal sealed class LobbyIslandPanel : Panel
 		else if ( Input.Pressed( Key.Right ) || arrows && Click( PreviousBox ) ) { Failure = ""; navigation.Navigate( 1 ); }
 		else if ( Input.Pressed( Key.Enter ) || Click( EnterBox ) ) { Failure = ""; navigation.Enter(); }
 		else if ( Click( GlobeBox ) ) GlobeRequested?.Invoke();
+		// US 0x658af1 posts a left press as message 0x10005 (button 0); when no page element takes it, the lobby
+		// controller's handler 0x5e2310 calls its enter method 0x5e1cc0, the same key/GameType check as the gate.
+		// Which elements take the press is inferred: the page's model elements (panel, buttons, key, cost, count).
+		else if ( Input.LeftPressed && !pageElements.Any( LobbyNamingPanel.Hit ) ) { Failure = ""; navigation.Enter(); }
 	}
+	private static readonly Rectangle[] pageElements =
+		[Box( 28, 855, 476, 1521 ), Box( 554, 170, 990, 437 ), Box( 1045, 191, 1405, 416 ), Box( 1688, 68, 1963, 186 )];
 	/// <summary>
 	/// Shows the hovered element's help and, on its first help since activation, places MessageTag1 at its centre
 	/// (0x48b9f0 event 0x11). A disabled arrow is treated as not hovered (inferred: retail disabled elements are

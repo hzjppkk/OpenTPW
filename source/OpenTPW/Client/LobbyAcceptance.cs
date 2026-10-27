@@ -80,7 +80,11 @@ internal sealed class LobbyAcceptance
 					LobbyCameraMode.Movement == LobbyCameraState.Movement.Orbiting, "alignment cancellation leaves the gate closed" );
 				Next( 3 ); break;
 			case 3 when elapsed > 1:
-				Check( navigation.Enter(), "entry can restart after cancellation" ); Next( 4 ); break;
+				// Retail also enters when a left press lands on the scene rather than a page element (0x5e2310).
+				Hover( 1024, 700 ); Input.ClickOverride = true; Next( 35 ); break;
+			case 35 when elapsed > 0.3:
+				Input.PointerOverride = null;
+				Check( navigation.Entering, "clicking the scene restarts entry after cancellation" ); Next( 4 ); break;
 			case 4 when LobbyCameraMode.Movement == LobbyCameraState.Movement.Entering:
 				// Cancel in the update that actually dispatched M1, while its non-looping segment is unfinished.
 				Check( opened == 1 && navigation.CancelEntry() && closed == 1, "opened gate dispatches one close request" );
