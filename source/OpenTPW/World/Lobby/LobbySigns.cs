@@ -132,16 +132,15 @@ public static class LobbySigns
 
 	public static (string First, string Second) LocalizedLines( string modelPath )
 	{
-		int index = Path.GetFileNameWithoutExtension( modelPath ).ToLowerInvariant() switch
+		int gateObjectId = Path.GetFileNameWithoutExtension( modelPath ).ToLowerInvariant() switch
 		{
-			"jun_isle" or "jun_gate" => 85,
-			"hal_isle" or "hal_gate" => 179,
-			"fan_isle" or "fan_gate" => 272,
-			"spa_isle" or "spa_gate" => 368,
+			"jun_isle" or "jun_gate" => 1601,
+			"hal_isle" or "hal_gate" => 2601,
+			"fan_isle" or "fan_gate" => 4601,
+			"spa_isle" or "spa_gate" => 3601,
 			_ => throw new InvalidDataException( $"Unknown lobby sign model {modelPath}" )
 		};
-		var names = new StringFile( GameLanguage.Path( "OBJECT_NAMES.str" ) );
-		return (names[index], names[index + 1]);
+		return LobbyObjectNames.Lines( gateObjectId );
 	}
 
 	/// <summary>Splits the visual top-first atlas into two top-first 128-square materials.</summary>

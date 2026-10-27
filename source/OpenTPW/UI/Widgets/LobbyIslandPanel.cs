@@ -111,7 +111,7 @@ internal sealed class LobbyIslandPanel : Panel
 				count.Draw(); goldKey.Draw();
 			}
 		}
-		title.Text = navigation.Island.Name;
+		title.Text = navigation.IslandTitle;
 		title.Draw(); error.Draw();
 	}
 }

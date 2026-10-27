@@ -7,11 +7,15 @@ public sealed class LobbyNavigation
 {
 	private readonly LobbyConfig config;
 	private readonly Dictionary<int, int> costs = new();
+	private readonly Dictionary<int, string> defaultTitles = new();
+	private Dictionary<int, string> titles = new();
 	private PlayerProfileFile? profile;
 	private int index;
 	public bool Active => profile != null;
 	public bool Entering { get; private set; }
 	public LobbyIslandConfig Island => config.Islands[index];
+	/// <summary>Localized gate name or the selected player's saved sign name; prepared before the page is drawn.</summary>
+	public string IslandTitle => Active ? titles[Island.Id] : defaultTitles[Island.Id];
 	public int Keys => profile == null ? 0 : LobbyPlayerProgress.KeyCount( profile, config.Islands.Select( island => island.ThemeName ) );
 	/// <summary>Keys needed to enter the current island: <c>Keys.CostToEnter</c> from the theme's global.sam (1..5).</summary>
 	public int RequiredKeys => costs[Island.Id];
@@ -34,12 +38,21 @@ public sealed class LobbyNavigation
 			if ( !int.TryParse( settings["Keys.CostToEnter"], NumberStyles.Integer, CultureInfo.InvariantCulture, out int cost ) || cost < 1 || cost > 5 )
 				throw new InvalidDataException( $"Invalid Keys.CostToEnter for {island.ThemeName}" );
 			costs.Add( island.Id, cost );
+			// US 0x5b11c0 loads global.sam; its balance descriptor 0x73f8a8 puts ParkName.GateObjectId
+			// at +0x18. US 0x5b12e0 passes that object ID to 0x412fb0 for the default title.
+			if ( !int.TryParse( settings["ParkName.GateObjectId"], NumberStyles.Integer, CultureInfo.InvariantCulture, out int gateObjectId ) )
+				throw new InvalidDataException( $"Invalid ParkName.GateObjectId for {island.ThemeName}" );
+			var lines = LobbyObjectNames.Lines( gateObjectId );
+			defaultTitles.Add( island.Id, LobbyObjectNames.Title( lines.First, lines.Second ) );
 		}
 	}
 	public void Bind( PlayerProfileFile player )
 	{
+		ArgumentNullException.ThrowIfNull( player );
+		titles = config.Islands.ToDictionary( island => island.Id,
+			island => LobbyPlayerProgress.IslandTitle( player, island.ThemeName, defaultTitles[island.Id] ) );
 		// A new player selection starts at the first configured island, never a stale entry state.
-		profile = player ?? throw new ArgumentNullException( nameof(player) );
+		profile = player;
 		Entering = false;
 		index = 0;
 		IslandSelected?.Invoke( Island.Id );
