@@ -122,6 +122,10 @@ public partial class Texture : Asset
 		}
 
 		PreprocessTextureData( ref data, ref width, ref height, flags );
+		// Every texture goes through the retail 16-bit texture format (RetailTexturePixels.QuantizeArgb4444).
+		// Copy first: callers may keep reusing their pixel buffer.
+		data = (byte[])data.Clone();
+		RetailTexturePixels.QuantizeArgb4444( data );
 
 		if ( flags.HasFlag( TextureFlags.PointFilter ) )
 			SamplerType = SamplerType.Point;
