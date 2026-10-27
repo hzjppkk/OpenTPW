@@ -3,7 +3,10 @@ using Veldrid;
 
 namespace OpenTPW;
 
-/// <summary>Two-button message dialog, table 0x74b468 and 0x47d290.</summary>
+/// <summary>
+/// Two-button message dialog, table 0x74b468 and 0x47d290. The US table (0x74f920) gives every element key 0x11 (and
+/// 0x12) = −1, so hovering OK or Cancel shows no help.
+/// </summary>
 internal sealed class LobbyConfirmPanel : Panel
 {
 	private readonly RootPanel hud;

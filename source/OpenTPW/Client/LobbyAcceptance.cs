@@ -22,6 +22,8 @@ internal sealed class LobbyAcceptance
 		LobbyCameraMode.GateAnimationRequested += ( _, entering ) => { if ( entering ) opened++; else closed++; };
 	}
 	private void Next( int value ) { stage = value; changed = Time.Now; }
+	/// <summary>Points the simulated mouse at a position in the 2048x1536 retail UI units.</summary>
+	private static void Hover( float x, float y ) => Input.PointerOverride = new Vector2( x * Screen.Size.X / 2048, y * Screen.Size.Y / 1536 );
 	private void Check( bool value, string description )
 	{
 		if ( !value ) throw new InvalidOperationException( $"Lobby acceptance failed: {description}" );
@@ -77,9 +79,19 @@ internal sealed class LobbyAcceptance
 				Check( level.Menu!.Active && level.Hud.Modal == level.Menu, "orbit Escape opens the shared local menu" );
 				Next( 9 ); break;
 			case 9 when elapsed > 0.5:
-				Capture( "lobby-menu" ); level.Menu!.Choose( UIStrings.QuitGame ); Next( 15 ); break;
+				// The Escape menu items are created at run time and never set element help (US 0x48c600, 0x492f60).
+				Capture( "lobby-menu" ); Hover( 1024, 30 ); Next( 32 ); break;
+			case 32 when elapsed > 0.3:
+				Capture( "lobby-menu-hover" );
+				Check( level.Help?.Shown == -1, "hovering an Escape menu item shows no help" );
+				Input.PointerOverride = null; level.Menu!.Choose( UIStrings.QuitGame ); Next( 15 ); break;
 			case 15 when elapsed > 0.5:
-				Capture( "lobby-quit-cancel" ); Confirmation.Close();
+				// Confirmation table US 0x74f920: every element has help -1.
+				Capture( "lobby-quit-cancel" ); Hover( (1379 + 1462) / 2f, (522 + 605) / 2f ); Next( 33 ); break;
+			case 33 when elapsed > 0.3:
+				Capture( "lobby-quit-hover" );
+				Check( level.Help?.Shown == -1, "hovering the confirmation OK shows no help" );
+				Input.PointerOverride = null; Confirmation.Close();
 				Check( level.Menu!.Active && level.Hud.Modal == level.Menu, "quit cancellation restores menu input" );
 				level.Menu.Choose( UIStrings.ResumeGame );
 				Check( !level.Menu.Active && level.Hud.Modal == null && navigation.Active, "resume leaves the selected player and island intact" );
@@ -88,7 +100,12 @@ internal sealed class LobbyAcceptance
 					level.Hud.Modal == null, "confirmed new-player selection returns to profiles" );
 				Next( 10 ); break;
 			case 10 when elapsed > 0.5:
-				Capture( "lobby-player" );
+				// Player page table US 0x753c60: slot and Quit elements have help -1.
+				Capture( "lobby-player" ); Hover( (884 + 2048) / 2f, (46 + 193) / 2f ); Next( 31 ); break;
+			case 31 when elapsed > 0.3:
+				Capture( "lobby-player-hover" );
+				Check( level.Help?.Shown == -1, "hovering a player slot shows no help" );
+				Input.PointerOverride = null;
 				// An empty slot exercises the real naming dialog without publishing a new profile.
 				int empty = Array.FindIndex( LobbyPlayerProfiles.Read(), profile => profile == null );
 				if ( empty < 0 ) throw new InvalidOperationException( "Naming acceptance needs an empty test slot" );

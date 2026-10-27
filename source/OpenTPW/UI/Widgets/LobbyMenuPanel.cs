@@ -3,7 +3,11 @@ using Veldrid;
 
 namespace OpenTPW;
 
-/// <summary>Local actions and Options from the shared Escape menu (US 0x48c600, 0x48bd40).</summary>
+/// <summary>
+/// Local actions and Options from the shared Escape menu (US 0x48c600, 0x48bd40). The items are run-time text
+/// elements added by 0x492f60, which sets no help number, so they keep the element default −1 written by the base
+/// constructor (US 0x65bdea, +0x90): no hover help.
+/// </summary>
 internal sealed class LobbyMenuPanel : Panel
 {
 	private readonly Level level;
