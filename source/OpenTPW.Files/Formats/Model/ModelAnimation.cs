@@ -56,8 +56,8 @@ public class ModelAnimation : BaseFormat
 		/// Bit 1: cubic Bezier with three points per key; bit 3: linear; otherwise Catmull-Rom.
 		/// </summary>
 		public uint Flags;
-		public NVector3[] Points;
-		public ushort[] Frames;
+		public NVector3[] Points = [];
+		public ushort[] Frames = [];
 	}
 
 	/// <summary>
@@ -65,9 +65,9 @@ public class ModelAnimation : BaseFormat
 	/// </summary>
 	public class VertexGroup
 	{
-		public ushort[] Vertices;
-		public ushort[] Frames;
-		public uint[] Values;
+		public ushort[] Vertices = [];
+		public ushort[] Frames = [];
+		public uint[] Values = [];
 	}
 
 	public class PackedVertexKeys
@@ -82,7 +82,7 @@ public class ModelAnimation : BaseFormat
 		/// <summary>
 		/// Group 0 animates the bounding box; the rest move vertices.
 		/// </summary>
-		public VertexGroup[] Groups;
+		public VertexGroup[] Groups = [];
 	}
 
 	/// <summary>
@@ -93,9 +93,9 @@ public class ModelAnimation : BaseFormat
 		/// <summary>
 		/// For each raw vertex, the stored position it takes; null when they correspond one to one.
 		/// </summary>
-		public uint[] Sources;
+		public uint[]? Sources;
 		public int Count;
-		public NVector3[] Positions;
+		public NVector3[] Positions = [];
 	}
 
 	/// <summary>
@@ -103,10 +103,10 @@ public class ModelAnimation : BaseFormat
 	/// </summary>
 	public class TexCoordKeys
 	{
-		public ushort[] Starts;
-		public ushort[] Counts;
-		public ushort[] Frames;
-		public NVector2[] Values;
+		public ushort[] Starts = [];
+		public ushort[] Counts = [];
+		public ushort[] Frames = [];
+		public NVector2[] Values = [];
 	}
 
 	public class Track
@@ -122,21 +122,21 @@ public class ModelAnimation : BaseFormat
 		/// </summary>
 		public byte[][] Eases = [];
 		public ScaleKey[] Scales = [];
-		public PathData Path;
+		public PathData? Path;
 
 		/// <summary>
 		/// The absolute value is a frame; positive shows the node from then on, zero or negative hides it.
 		/// </summary>
 		public short[] Visibility = [];
-		public PackedVertexKeys PackedVertices;
-		public VertexFrameKeys VertexFrames;
-		public TexCoordKeys TexCoords;
+		public PackedVertexKeys? PackedVertices;
+		public VertexFrameKeys? VertexFrames;
+		public TexCoordKeys? TexCoords;
 	}
 
 	public uint Flags { get; private set; }
 	public uint StartFrame { get; private set; }
 	public uint EndFrame { get; private set; }
-	public List<Track> Tracks { get; private set; }
+	public List<Track> Tracks { get; private set; } = [];
 	/// <summary>Nodes hidden for this segment, independently of per-frame visibility tracks (TP.exe 0x471030).</summary>
 	public ushort[] HiddenNodes { get; private set; } = [];
 
@@ -293,7 +293,7 @@ public class ModelAnimation : BaseFormat
 		return values;
 	}
 
-	private static PathData ReadPath( BinaryReader reader, uint offset )
+	private static PathData? ReadPath( BinaryReader reader, uint offset )
 	{
 		reader.BaseStream.Seek( offset, SeekOrigin.Begin );
 		var path = new PathData { Flags = reader.ReadUInt32() };
@@ -443,10 +443,10 @@ public class ModelAnimation : BaseFormat
 			{
 				raw[track.Node] ??= mesh.RawPositions.Select( p => p.GetSystemVector3() ).ToArray();
 
-				if ( track.PackedVertices != null )
-					ApplyPackedVertices( track.PackedVertices, frame, raw[track.Node] );
-				else
-					ApplyVertexFrames( track.VertexFrames, frame, raw[track.Node] );
+				if ( track.PackedVertices is { } packed )
+					ApplyPackedVertices( packed, frame, raw[track.Node] );
+				else if ( track.VertexFrames is { } vertexFrames )
+					ApplyVertexFrames( vertexFrames, frame, raw[track.Node] );
 			}
 
 			if ( FindSegment( track.Rotations.Length, i => track.Rotations[i].Frame, frame, out int key, out int next, out float t ) )
@@ -490,10 +490,11 @@ public class ModelAnimation : BaseFormat
 
 		for ( int i = 0; i < raw.Length; i++ )
 		{
-			if ( raw[i] == null )
+			// Raw positions are only created for nodes that carry a mesh.
+			if ( raw[i] == null || model.Nodes[i].Mesh is not { } nodeMesh )
 				continue;
 
-			var order = model.Nodes[i].Mesh.VertexOrder;
+			var order = nodeMesh.VertexOrder;
 			var positions = new Vector3[order.Length];
 			for ( int j = 0; j < order.Length; j++ )
 				positions[j] = order[j] < raw[i].Length ? raw[i][order[j]] : NVector3.Zero;

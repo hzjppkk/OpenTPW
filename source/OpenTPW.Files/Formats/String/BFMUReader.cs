@@ -23,7 +23,7 @@ public sealed class BFMUReader : BaseFormat
 	/// How many of the top byte values start a two-byte code.
 	/// </summary>
 	public int LeadByteCount { get; private set; }
-	public char[] Characters { get; private set; }
+	public char[] Characters { get; private set; } = [];
 
 	private int FirstLeadByte => 256 - LeadByteCount;
 

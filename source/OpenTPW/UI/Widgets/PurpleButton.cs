@@ -31,7 +31,7 @@ internal class PurpleButton : Panel
 	private Texture Label;
 	private Rectangle LabelRect;
 
-	private static FontFile Font;
+	private static FontFile? Font;
 
 	public string Text { get; set; }
 

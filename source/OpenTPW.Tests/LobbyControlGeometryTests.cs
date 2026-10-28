@@ -19,7 +19,7 @@ public class LobbyControlGeometryTests
 		{
 			var glyph = font.GetGlyph( character );
 			Assert.IsNotNull( glyph, $"Missing quit message glyph U+{(int)character:X4}" );
-			Assert.IsTrue( glyph.Advance > 0 && glyph.Pixels.Any( pixel => pixel > 0 ) );
+			Assert.IsTrue( glyph!.Advance > 0 && glyph.Pixels.Any( pixel => pixel > 0 ) );
 		}
 	}
 	[TestMethod]

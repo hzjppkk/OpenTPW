@@ -47,12 +47,12 @@ public sealed class FontFile : BaseFormat
 		/// <summary>
 		/// Coverage from 0 to 255, Width * Height, row by row.
 		/// </summary>
-		public byte[] Pixels { get; set; }
+		public byte[] Pixels { get; set; } = [];
 	}
 
 	public int Version { get; private set; }
 	public int SizeHint { get; private set; }
-	public Glyph[] Glyphs { get; private set; }
+	public Glyph[] Glyphs { get; private set; } = [];
 
 	/// <summary>
 	/// Height of a line: the lowest glyph bottom.
@@ -159,7 +159,7 @@ public sealed class FontFile : BaseFormat
 		}
 	}
 
-	public Glyph GetGlyph( char character ) => glyphsByCharacter.GetValueOrDefault( character );
+	public Glyph? GetGlyph( char character ) => glyphsByCharacter.GetValueOrDefault( character );
 
 	public int MeasureString( string text ) => text.Sum( c => GetGlyph( c )?.Advance ?? 0 );
 

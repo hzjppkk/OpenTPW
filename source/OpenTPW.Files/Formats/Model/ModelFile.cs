@@ -14,7 +14,7 @@ public partial class ModelFile : BaseFormat
 	/// Every node in the model: first one per mesh (in the same order as <see cref="Meshes"/>),
 	/// then the transform-only nodes, which are attachment points such as emitters and paths.
 	/// </summary>
-	public List<Node> Nodes { get; private set; }
+	public List<Node> Nodes { get; private set; } = [];
 
 	public ModelFile( Stream stream )
 	{
@@ -51,12 +51,12 @@ public partial class ModelFile : BaseFormat
 		/// Positions as stored, before <see cref="VertexOrder"/> expands them into <see cref="Vertices"/>.
 		/// Vertex animation addresses these.
 		/// </summary>
-		public Vector3[] RawPositions { get; set; }
+		public Vector3[] RawPositions { get; set; } = [];
 
 		/// <summary>
 		/// For each entry in <see cref="Vertices"/>, the index of its position in <see cref="RawPositions"/>.
 		/// </summary>
-		public ushort[] VertexOrder { get; set; }
+		public ushort[] VertexOrder { get; set; } = [];
 
 		/// <summary>
 		/// Texture coordinates as stored. V runs bottom-up relative to the image that
@@ -104,7 +104,7 @@ public partial class ModelFile : BaseFormat
 
 	public class Node
 	{
-		public string Name { get; set; }
+		public string Name { get; set; } = "";
 		public uint Flags { get; set; }
 		/// <summary>Authored node identifier, used when the animation instance requests ID binding.</summary>
 		public ushort Id { get; set; }
@@ -127,7 +127,7 @@ public partial class ModelFile : BaseFormat
 		/// <summary>
 		/// The mesh at this node, or null for a transform-only node.
 		/// </summary>
-		public Mesh Mesh { get; set; }
+		public Mesh? Mesh { get; set; }
 	}
 
 	public struct FrameData
@@ -396,8 +396,8 @@ public partial class ModelFile : BaseFormat
 			for ( int nodeIdx = 0; nodeIdx < Nodes.Count; nodeIdx++ )
 			{
 				var world = ResolveWorld( nodeIdx, 0 );
-				if ( Nodes[nodeIdx].Mesh != null )
-					Nodes[nodeIdx].Mesh.WorldTransform = world;
+				if ( Nodes[nodeIdx].Mesh is { } mesh )
+					mesh.WorldTransform = world;
 			}
 
 			// Process mesh data

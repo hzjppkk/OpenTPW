@@ -10,7 +10,7 @@ namespace OpenTPW.Tests;
 [TestClass]
 public class ModelTests
 {
-	private static byte[] Header( string path )
+	private static byte[]? Header( string path )
 	{
 		using var stream = FileSystem.OpenRead( path );
 		var header = new byte[0x9C];
@@ -59,7 +59,7 @@ public class ModelTests
 		int count = 0;
 
 		var models = GameData.FindFiles( ".md2" );
-		var byName = models.GroupBy( x => Path.Combine( Path.GetDirectoryName( x ), Path.GetFileNameWithoutExtension( x ) ).ToLowerInvariant() )
+		var byName = models.GroupBy( x => Path.Combine( Path.GetDirectoryName( x ) ?? "", Path.GetFileNameWithoutExtension( x ) ).ToLowerInvariant() )
 			.ToDictionary( x => x.Key, x => x.First() );
 
 		foreach ( var path in models )
@@ -70,7 +70,7 @@ public class ModelTests
 
 			// "<model><slot letter>[n].md2" animates "<model>.md2" in the same folder
 			var match = Regex.Match( Path.GetFileNameWithoutExtension( path ), @"^(.+)[A-Za-z]\d{0,2}$" );
-			if ( !match.Success || !byName.TryGetValue( Path.Combine( Path.GetDirectoryName( path ), match.Groups[1].Value ).ToLowerInvariant(), out var basePath ) )
+			if ( !match.Success || !byName.TryGetValue( Path.Combine( Path.GetDirectoryName( path ) ?? "", match.Groups[1].Value ).ToLowerInvariant(), out var basePath ) )
 				continue;
 
 			count++;
