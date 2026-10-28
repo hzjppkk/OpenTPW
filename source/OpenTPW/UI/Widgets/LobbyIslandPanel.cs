@@ -94,7 +94,8 @@ internal sealed class LobbyIslandPanel : Panel
 	/// skips elements that are hidden (+0x48 bit 0), disabled (+0x48 bit 1, set by 0x65da8d) or detached (+4), and
 	/// otherwise takes any element whose shape (+0x44) contains the point. The panel's shape is its outline polygon and
 	/// its children (buttons, key, cost, count group, title text) use their rectangles; the buttons lie inside the
-	/// outline. The advisor is an engine model, not a UI element, so it never blocks.
+	/// outline. The advisor is an engine model, not a UI element, and the help strip is created disabled (US 0x4922a6
+	/// calls element +0x14 with 0), so neither blocks.
 	/// </summary>
 	private bool PageTakesPointer()
 	{
