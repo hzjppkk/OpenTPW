@@ -27,8 +27,7 @@ internal sealed class LobbyUiText : Panel
 	/// Lay the text out within the rectangle width. US 0x65c4b9(1, 1) sends text message 0x3000, which the text element
 	/// handler 0x48fc40 stores at +0xda/+0xdb; the element draw 0x48f830 then passes its own width to the layout instead
 	/// of the unlimited 0x4000 used when +0xda is 0. The confirmation message (0x47f0af) and the help strip (0x492233)
-	/// set it. The layout engine's break rule (0x6aeb10, per-glyph flags) has not been traced, so lines break at spaces
-	/// and an over-long word keeps its own clipped line.
+	/// set it. The break rules are in <see cref="Layout"/>.
 	/// </summary>
 	public bool WordWrap { get; set; }
 
@@ -85,25 +84,62 @@ internal sealed class LobbyUiText : Panel
 			foreach ( string line in Lines( value ) )
 				if ( line.Length != 0 ) Prepare( line );
 	}
-	/// <summary>Explicit lines, each split further at spaces when <see cref="WordWrap"/> is on.</summary>
-	internal string[] Lines( string text )
+	/// <summary>Lines as drawn: paragraphs, and with <see cref="WordWrap"/> lines filled to the rectangle width.</summary>
+	internal string[] Lines( string text ) => Layout( text, WordWrap ? units.Width / 3.2f : float.PositiveInfinity, part => font.MeasureString( part ) );
+
+	/// <summary>
+	/// The retail text layout (US 0x6ae0f0). 0x6ae930 classifies each character with 0x6aeab0: space and tab 0x12
+	/// (blank, break opportunity), line feed 0x4 and carriage return 0xC (paragraph end), anything else 0x1 (so a
+	/// comma is not a break). 0x6aeb10 ends a paragraph at each 0x4 character, swallowing one directly following
+	/// carriage return, and emits a final paragraph only when characters remain. 0x6aec80 fills lines: characters are
+	/// added while the width stays within the line; on overflow it looks back from the overflowing character (not
+	/// testing the line's first one) for a space or tab. If found, the line ends before it, minus earlier blanks; if
+	/// not, the word is cut before the overflowing character, or after it when that character starts the line. Blanks
+	/// after a break are skipped. Paragraph breaks have no width and are not drawn.
+	/// </summary>
+	internal static string[] Layout( string text, float width, Func<string, float> measure )
 	{
-		var explicitLines = text.Replace( "\r\n", "\n" ).Replace( '\r', '\n' ).Split( '\n' );
-		if ( !WordWrap ) return explicitLines;
-		float width = units.Width / 3.2f;
+		static bool Blank( char c ) => c is ' ' or '\t';
+		static bool Break( char c ) => c is '\n' or '\r';
+		static string Clean( string part ) => part.Replace( "\n", "" ).Replace( "\r", "" );
 		var lines = new List<string>();
-		foreach ( string line in explicitLines )
+		void Fill( string raw )
 		{
-			string current = "";
-			foreach ( string word in line.Split( ' ' ) )
+			int start = 0;
+			for ( int k = 0; k < raw.Length; k++ )
 			{
-				string candidate = current.Length == 0 ? word : current + " " + word;
-				// A single word wider than the box keeps its own line and is clipped.
-				if ( current.Length != 0 && font.MeasureString( candidate ) > width ) { lines.Add( current ); current = word; }
-				else current = candidate;
+				if ( Break( raw[k] ) || measure( Clean( raw[start..(k + 1)] ) ) <= width ) continue;
+				int end, next;
+				if ( k == start ) end = next = k + 1;
+				else
+				{
+					int blank = k;
+					while ( blank != start && !Blank( raw[blank] ) ) blank--;
+					if ( blank == start ) end = next = k;
+					else
+					{
+						int last = blank - 1;
+						while ( last != start && Blank( raw[last] ) ) last--;
+						end = last + 1;
+						next = blank;
+					}
+				}
+				while ( next != raw.Length && Blank( raw[next] ) ) next++;
+				lines.Add( Clean( raw[start..end] ) );
+				start = next;
+				k = next - 1;
 			}
-			lines.Add( current );
+			if ( start != raw.Length ) lines.Add( Clean( raw[start..] ) );
 		}
+		int paragraph = 0;
+		for ( int i = 0; i < text.Length; )
+		{
+			if ( !Break( text[i++] ) ) continue;
+			if ( i < text.Length && text[i] == '\r' ) i++;
+			Fill( text[paragraph..i] );
+			paragraph = i;
+		}
+		if ( paragraph != text.Length ) Fill( text[paragraph..] );
 		return lines.ToArray();
 	}
 	private Texture Prepare( string text )
