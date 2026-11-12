@@ -109,7 +109,7 @@ public sealed partial class SaveFile
 	/// <summary>
 	/// The nine values of the GameSystem module; the first three are times near <see cref="ClockTime"/>.
 	/// </summary>
-	public uint[] GameSystem { get; private set; }
+	public uint[] GameSystem { get; private set; } = [];
 
 	/// <summary>
 	/// One entry per ride system slot in use: the placed objects (handle 1 and up, Kind 815 or 865) and models the
@@ -121,7 +121,7 @@ public sealed partial class SaveFile
 	/// <summary>
 	/// Build time stamp of the game that wrote the save, from the track rides module, e.g. "10:12:51Nov 17 1999".
 	/// </summary>
-	public string BuildStamp { get; private set; }
+	public string BuildStamp { get; private set; } = "";
 
 	/// <summary>
 	/// Number of flying rides in the save.
@@ -171,7 +171,7 @@ public sealed partial class SaveFile
 			throw new Exception( $"Bad header of the {name} block: {magic:X8}" );
 	}
 
-	private void Module( BinaryReader reader, string name, long start, string tag )
+	private void Module( BinaryReader reader, string name, long start, string? tag )
 	{
 		ModuleRanges[name] = (start, reader.BaseStream.Position - start);
 		if ( tag != null )

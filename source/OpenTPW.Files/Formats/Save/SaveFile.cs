@@ -170,7 +170,7 @@ public sealed partial class SaveFile : BaseFormat
 	/// <summary>
 	/// <see cref="MapSize"/> x <see cref="MapSize"/>, row by row.
 	/// </summary>
-	public MapCell[] Map { get; private set; }
+	public MapCell[] Map { get; private set; } = [];
 	public List<Thing> Things { get; } = new();
 	public IEnumerable<ParkObject> Objects => Things.OfType<ParkObject>();
 
