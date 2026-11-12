@@ -178,7 +178,8 @@ public class Level
 		keyEffects?.Advance( Time.Delta );
 		// Lobby_UpdateCameraAndWeather (US 0x5e0470) updates the camera before calculating distance-controlled weather.
 		Camera.Update();
-		if ( GlobeMenu?.Active != true ) LobbySound?.SetIsland( LobbyCameraMode.CurrentIsland.ThemeName );
+		// The park preview has no lobby, so no island to follow.
+		if ( Lobby != null && GlobeMenu?.Active != true ) LobbySound?.SetIsland( LobbyCameraMode.CurrentIsland.ThemeName );
 		// Flocks can add model entities while replenishing their actor list.
 		foreach ( var entity in Entity.All.ToArray() )
 			if ( GlobeMenu?.Active != true || entity == Hud || GlobeMenu.Owns( entity ) ) entity.Update();
